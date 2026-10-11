@@ -59,6 +59,56 @@ npm run smoke
 
 Verification compares the complete file set, JSON values, decoded RGBA pixels and font bytes. Different Pillow/zlib versions may encode identical pixels into different PNG bytes; JSON whitespace may also differ.
 
+## How the original assets are stored and decoded
+
+The original game does not store browser-ready images or JSON. Its graphics are indexed, planar binary resources; its object placement, collision geometry, animation descriptors and scripts are tables inside DOS load images. Decoding has three distinct steps:
+
+```text
+Original DOS files (SIMPSONS.EXE, LEVEL*.OVL, VGA.OVL)
+  -> unpack_simpsons.py: PKLITE decompression -> *.image.bin
+  -> export-viewer-assets.py: binary tables/graphics -> PNG + JSON + font
+  -> npm run import-assets: copy the viewer output -> wwwroot/data
+```
+
+### 1. Remove executable compression
+
+The supported executable and graphics overlays are MZ files packed with PKLITE 1.12. `tools/unpack_simpsons.py` implements the relevant PKLITE LZ/Huffman decompression, including the small/large and extra variants. It extracts the decompressed **load image**, without rebuilding a runnable MZ executable. Offsets in the next step refer to these flat images, not to the original compressed files. The unpacker also writes `unpack_manifest.json` with its extraction results.
+
+### 2. Decode level graphics
+
+`tools/simpsons_ovl_assets.py` reads the resource interface at offset `0x001C` in each unpacked `LEVELn.OVL.image.bin`. This short machine-code stub returns four resource locations in AX/BX/CX/DX: map, tiles, object sprites and Bart sprites. Locations are DOS paragraphs, so the byte offset is `paragraph * 16`. The decoder validates the instruction signature and resource sizes instead of assuming every level has Level 1's layout.
+
+| Resource | Original storage | Decoding |
+| --- | --- | --- |
+| Background map | 11 rows per column; each tile ID is a **big-endian 16-bit word**, unlike most other DOS fields | Lookup is `column * 11 + row`. Place the referenced 16×16 tile at `(column * 16, row * 16)` to build `background_map.png`. |
+| Background tiles | 16×16 pixels, 4 bits per pixel, **128 bytes per tile** | Each row contains eight bytes: `P0-left, P0-right, P1-left, P1-right, P2-left, P2-right, P3-left, P3-right`. Combine the corresponding bits into a palette index 0–15. |
+| Object sprite sheet | 320×272 pixels; four separate 1-bit colour planes, followed by an equally sized zero-filled block | Each plane has 40 bytes per row. Combine plane bits into `P0 + 2*P1 + 4*P2 + 8*P3`. |
+| Bart sprite sheet | 320×288 pixels; the same five-block storage arrangement | Decode the four colour planes in the same way. The fifth block is checked to be zero; it is **not** a stored transparency mask. |
+| Sprite frames | 12-byte descriptors stored in `SIMPSONS.EXE`, referencing rectangles in the decoded sheets | Crop each rectangle into `object_frames/object_NNN.png` or `bart_frames/bart_NNN.png`. Sprite colour index 0 becomes transparent. |
+| Palettes | Two per-level banks in the executable, each with a 16-byte adapter map and sixteen VGA RGB triples with 6-bit components | Convert DAC components to 8-bit RGB. Current exported gameplay PNGs use palette bank A; both banks and adapter mappings remain available in the manifest. |
+
+The decoder can also export complete sheets, tile atlases, individual tiles and palette previews. The viewer exporter keeps the smaller set used by the application. It does not require those analysis images in `wwwroot/data`.
+
+### 3. Decode gameplay tables, scripts, text and font
+
+Graphics alone are insufficient: a sheet does not say where objects belong, how they move or which collision handler they use. `SIMPSONS.EXE.image.bin` contains the level metadata at segments `096D`, `0C8C`, `0F6B`, `1239` and `1556` for Levels 1–5. The corresponding flat-image base is `segment << 4`; a local table address becomes `base + offset`.
+
+Each level starts with a `LevelRuntimeConfig` containing pointers to descriptor tables, object sources, scripts, collision profiles and static terrain. Most table fields are little-endian 16-bit values. The decoder follows these pointers and exports:
+
+| Generated file, per level | Contents and original source |
+| --- | --- |
+| `manifest.json` | Resource boundaries, world dimensions, palettes and sprite descriptors, plus runtime/table summaries. Combines the level overlay layout with executable metadata. |
+| `runtime_data.json` | Persistent object sources (10-byte records: streaming X, X, Y, type offset, flags), collision profiles (12-byte records: handler-table offset, X offset, width, Y offset, height, transition parameter), and static terrain (6-byte records: X start, X end, Y/flags). |
+| `object_scripts.json` | Decoded object instructions, arguments, original addresses, control-flow edges, frame references, child types, sound references and native calls. DOS scripts are **direct-threaded**: instruction words identify handler addresses, followed by handler-specific arguments. The decoder uses recovered handler definitions to interpret these words. Unknown or dynamic native branches are reported as unresolved rather than invented. |
+| `player_runtime.json` | Camera/player limits, starting position, default ground height, initial packed-BCD goals, and progress/inventory source pointers read from `LevelRuntimeConfig`. Also includes the modeled initial movement defaults: speed cap `0x0200` and animation reload `3`. |
+| `event_messages.json` | Text and original message bytes read from the recovered executable message banks. Level 1 exports 19 messages starting at `096D:170B`; Level 5 exports five starting at `1556:1A20`. Messages end with zero; control bytes `01`/`02` plus their arguments describe line/position changes. Levels 2–4 currently export an empty `messages` list. This is the recovered message subset, not a claim that all game text has been catalogued. |
+
+`tools/export-viewer-assets.py` calls the lower-level decoder and adds the player configuration, event messages and font needed by the viewer. It reads all **256 8×8 glyphs** from offset `0x4609` of `VGA.OVL.image.bin` into `dos_font_8x8.bin`: eight row bytes per glyph, 2,048 bytes total. The browser loads this file at startup; original font bytes are not embedded in the TypeScript source.
+
+**All 25 level JSON files are generated from this pipeline**, alongside 1,427 PNGs and the font. They are not copied from an existing `wwwroot/data`, and no original game input is bundled with the extractor. The scripts contain recovered format definitions, addresses and limited runtime defaults. These addresses and message ranges target the supported DOS release, so this is not a universal decoder for other releases or ports.
+
+Extraction makes the data available to the TypeScript runtime; it does not automatically implement every original engine/native function. In particular, common-overlay inventory/shop raster graphics, presentation screens and audio decoding remain outside this viewer export. The documented shop-frame substitutes and logical sound events are still runtime approximations.
+
 ## Current milestone — v0.9.6
 
 The project now connects the recovered object ScriptVM, Bart movement, collision engine, damage state, DOS-style HUD and the recovered 14-slot inventory/action state:
