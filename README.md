@@ -320,8 +320,8 @@ Known Level-1 `CallNativeFar` callbacks are modeled directly, including the mult
 
 Open either:
 
-- `Simpsons.ScriptVmViewer.slnx`, or
-- `Simpsons.ScriptVmViewer.esproj`.
+- `retro-mutant.slnx`, or
+- `retro-mutant.esproj`.
 
 For TypeScript/browser debugging, choose **Simpsons Viewer (Edge)** (or Chrome) in the Start/debug dropdown and press **F5**. Visual Studio runs `npm run dev`, opens `http://localhost:5173` under the browser debugger, and binds `src/**/*.ts` breakpoints through the checked-in source maps.
 
@@ -366,3 +366,11 @@ Generate the Level 1–5 gameplay JSON, object frame PNGs and **416 original Bar
 
 
 See `docs/LEVEL_HANDLERS.md` for the typed per-level handler lifecycle and Level-1 code map.
+
+## Legal and attribution
+
+This is an unofficial hobby project created for fun, learning and exploring how the original DOS game works. We respect the original creators and rights holders and have no intention of infringing their copyrights or trademarks. This project is not affiliated with, endorsed by or sponsored by the owners of *The Simpsons* or *Bart vs. the Space Mutants*. All rights in the original game, characters, names, artwork, music and other original materials remain with their respective owners.
+
+The repository provides the reimplementation and extraction tools without distributing the original game files or decoded game assets. Users must supply a lawfully obtained copy of the supported DOS game and generate the required assets locally. Do not commit or redistribute original game files or extracted assets through this repository. The [MIT license](LICENSE) covers this project's original contributions; it does not grant rights to the original game or any third-party material.
+
+This statement describes our intentions and does not grant permission to use protected material or establish that a particular use is legally permitted. If you are a rights holder with a concern, please contact the maintainer through this repository so it can be reviewed and addressed.
