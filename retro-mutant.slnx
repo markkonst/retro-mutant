@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="retro-mutant.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+</Solution>

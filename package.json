@@ -1,0 +1,20 @@
+{
+  "name": "simpsons-dos-script-vm-viewer",
+  "version": "0.9.6",
+  "private": true,
+  "description": "Script-VM driven animation/runtime viewer for The Simpsons: Bart vs. the Space Mutants (DOS).",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "dev": "node tools/dev.mjs",
+    "serve": "node tools/server.mjs",
+    "clean": "node tools/clean.mjs",
+    "import-assets": "node tools/import-decoded-assets.mjs",
+    "smoke": "npm run build && node tools/smoke-runtime.mjs && node tools/smoke-collisions.mjs && node tools/smoke-damage-hud.mjs && node tools/smoke-special-static-frames.mjs && node tools/smoke-collision-matrix.mjs && node tools/smoke-collision-extended.mjs && node tools/smoke-clothesline.mjs && node tools/smoke-inventory.mjs && node tools/smoke-input-spray.mjs && node tools/smoke-level-handlers.mjs && node tools/smoke-level1-natives.mjs && node tools/smoke-level1-skateboard.mjs && node tools/smoke-level1-shop.mjs && node tools/smoke-level1-v096.mjs && node tools/smoke-dos-controls-cheats.mjs && node tools/smoke-story-vm.mjs",
+    "debug-check": "npm run build && node tools/check-debug-config.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
+  },
+  "type": "module"
+}

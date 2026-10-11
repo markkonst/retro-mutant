@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simpsons DOS Script VM Viewer</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand">
+      <strong>Simpsons DOS Script VM Viewer <span class="version-badge">v0.9.6</span></strong>
+      <span id="status">Starting…</span>
+    </div>
+
+    <label>Level
+      <select id="level-select">
+        <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+      </select>
+    </label>
+
+    <div class="simulation-controls" aria-label="Simulation controls">
+      <button id="play-button" type="button">Play</button>
+      <button id="step-button" type="button" title="One original logical object tick">Step tick</button>
+      <button id="reset-button" type="button">Reset</button>
+      <button id="select-bart-button" type="button" title="Selecteer Bart in de inspector">Bart</button>
+      <label>Viewer tick rate
+        <select id="tick-rate-select">
+          <option value="10">10 Hz</option>
+          <option value="18.2">18.2 Hz</option>
+          <option value="20" selected>20 Hz</option>
+          <option value="30">30 Hz</option>
+          <option value="60">60 Hz</option>
+        </select>
+      </label>
+    </div>
+
+    <button id="home-button" title="World start">|&lt;</button>
+    <button id="prev-screen-button" title="320 pixels left">-320</button>
+    <button id="next-screen-button" title="320 pixels right">+320</button>
+    <button id="end-button" title="World end">&gt;|</button>
+
+    <label class="camera-control">camera X
+      <input id="camera-slider" type="range" min="0" max="1" value="0">
+      <input id="camera-input" type="number" min="0" max="1" value="0" step="16">
+    </label>
+
+    <label>Zoom
+      <select id="zoom-select">
+        <option value="1">1×</option><option value="2">2×</option><option value="3" selected>3×</option><option value="4">4×</option><option value="5">5×</option><option value="6">6×</option>
+      </select>
+    </label>
+  </header>
+
+  <section class="debug-options">
+    <label><input id="toggle-anchors" type="checkbox" checked> runtime anchors</label>
+    <label><input id="toggle-labels" type="checkbox"> labels</label>
+    <label><input id="toggle-physics-collisions" type="checkbox" checked> physics collisions</label>
+    <label><input id="toggle-collision" type="checkbox"> collision boxes</label>
+    <label><input id="toggle-terrain" type="checkbox"> terrain</label>
+    <label><input id="toggle-invisible" type="checkbox" checked> invisible/controller markers</label>
+    <label><input id="toggle-blocked" type="checkbox" checked> blocked-VM outline</label>
+    <label><input id="toggle-debug-hud" type="checkbox"> modern debug HUD</label>
+    <label><input id="follow-bart" type="checkbox" checked> camera volgt Bart</label>
+    <button id="invulnerable-button" type="button" class="debug-toggle" aria-pressed="false" title="Viewer-only damage immunity; does not emulate COWABUNGA">🛡 Invulnerable: OFF</button>
+    <span id="invulnerable-state" class="debug-badge hidden">INVULN</span>
+    <span id="cheat-state" class="cheat-state">DOS cheats: none</span>
+    <span id="collision-state" class="collision-on">collisions: ON</span>
+    <span id="stats" class="stats"></span>
+  </section>
+
+  <main class="layout">
+    <section class="viewer-panel">
+      <div class="canvas-wrap">
+        <div id="game-hud" class="game-hud" aria-label="Live debug HUD">
+          <div class="hud-cell"><span class="hud-label">LIVES</span><strong id="hud-lives">3</strong></div>
+          <div class="hud-cell hud-health-cell"><span class="hud-label">HEALTH</span><strong id="hud-health" aria-label="2 of 2 health">●●</strong></div>
+          <div class="hud-cell"><span class="hud-label">SCORE</span><strong id="hud-score">000000</strong></div>
+          <div class="hud-cell"><span class="hud-label">TIME</span><strong id="hud-time">999</strong></div>
+          <div class="hud-cell"><span class="hud-label">GOALS</span><strong id="hud-goals">00</strong></div>
+          <div id="hud-state" class="hud-state">READY</div>
+          <div id="hud-event" class="hud-event" aria-live="polite"></div>
+        </div>
+        <canvas id="world-canvas" aria-label="Level runtime world"></canvas>
+      </div>
+      <div class="help">O/P (of ←/→) = lopen · Q/↑ = springen/omhoog · A/↓ = omlaag · Space = FIRE · A+Space = inventory kiezen, laat A los = gebruik · Q+Space = run/high-jump · F8 = play/pause · . = one tick · drag/wheel = camera · Ctrl+wheel = zoom</div>
+    </section>
+
+    <aside class="inspector">
+      <h2>Runtime inspector</h2>
+      <div id="inspector-content"><p>Klik op Bart, een runtime sprite of source-marker.</p></div>
+      <hr>
+      <h2>Milestone policy</h2>
+      <p>Sprites komen nu uit de <strong>echte scriptstate</strong>: <code>animBase + animFrame*12</code>. De statische <code>InitialFrameResolver</code> is niet meer de runtimebron.</p>
+      <p><code>SetAnimation</code>, <code>SetStaticFrame</code>, <code>Wait</code>, <code>Goto</code> en de eerste motion-opcodes worden uitgevoerd.</p>
+      <p>Bart gebruikt de aparte Bart-descriptortabel en de gereconstrueerde walk/jump/idle state. <strong>Terrain/object collisions, damage, invulnerability/blink, de DOS-HUD en inventory zijn actief.</strong> De HUD toont de gereconstrueerde gemeenschappelijke DOS-state: health, lives, score, timer en goals.</p>
+      <p>Oranje betekent dat dit object een nog niet geïmplementeerde runtimekeuze heeft bereikt. De laatste animatie en motion blijven wel doorstappen zodat het probleem zichtbaar blijft.</p>
+      <p class="muted">De Hz-keuze is alleen wall-clock pacing voor de viewer; de logische tickvolgorde is de gereconstrueerde DOS-volgorde.</p>
+    </aside>
+  </main>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
