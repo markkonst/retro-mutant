@@ -367,6 +367,8 @@ Generate the Level 1–5 gameplay JSON, object frame PNGs and **416 original Bar
 
 See `docs/LEVEL_HANDLERS.md` for the typed per-level handler lifecycle and Level-1 code map.
 
+See [`docs/DOS_FUNCTION_CATALOG.md`](docs/DOS_FUNCTION_CATALOG.md) for the recovered DOS function addresses, names, behavior, internal state-machine blocks and overlay entrypoints, with source references and research confidence.
+
 ## Legal and attribution
 
 This is an unofficial hobby project created for fun, learning and exploring how the original DOS game works. We respect the original creators and rights holders and have no intention of infringing their copyrights or trademarks. This project is not affiliated with, endorsed by or sponsored by the owners of *The Simpsons* or *Bart vs. the Space Mutants*. All rights in the original game, characters, names, artwork, music and other original materials remain with their respective owners.
