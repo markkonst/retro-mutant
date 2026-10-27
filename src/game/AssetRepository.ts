@@ -37,10 +37,11 @@ function bartDescriptorPath(level: LevelNumber, descriptorIndex: number): string
 }
 
 function collectReferencedDescriptors(scripts: ObjectScriptsJson): Set<number> {
+  // Frame 31 is the reserved boss shot, outside ordinary object scripts.
   // Descriptor frames 0..3 are the reserved Bart spray action-object visuals.
   // They are addressed by render offsets 00h/0Ch/18h/24h rather than by
   // ordinary object scripts, so the script-reference scan cannot discover them.
-  const result = new Set<number>([0, 1, 2, 3]);
+  const result = new Set<number>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 31]);
   for (const flow of scripts.object_types) {
     for (const index of flow.referenced_object_descriptor_indices) {
       result.add(index);

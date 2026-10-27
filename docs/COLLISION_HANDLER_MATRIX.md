@@ -1,4 +1,8 @@
-# Collision handler matrix — v0.9.0
+# Collision handler matrix
+
+[Collision guide](collisions/README.md) · [Documentation home](README.md)
+
+Current runtime coverage: **30 implemented, 7 partial, 6 deferred** across 43 slots. These are implementation labels, not confidence grades or a percentage of game completion.
 
 This table is the TypeScript counterpart of the DOS `Collision_HandlerJumpTable` at `0000:5F67`. `CollisionSystem` dispatches by the exported per-type `CollisionProfile.collision_index`, so object type transitions also switch collision semantics when their profile changes.
 
@@ -12,7 +16,7 @@ Fidelity meanings: **implemented** = the recovered branch is represented with th
 | 3 | `0x66F1` | `TopContactBounceBreakOrDamage` | **implemented** | Feet/top test, break counters, velocity reflection, score and damage path. |
 | 4 | `0x6BFD` | `CollectInventoryResource` | **partial** | Inventory BCD counters and known pickup effects implemented; presentation popup is not. |
 | 5 | `0x6CEC` | `ConsumeObjectAndTriggerEvent7` | **implemented** | Score 100, goal decrement, sound 7 and consume. |
-| 6 | `0x6817` | `CollectObjectiveAndAdvanceSequence` | **partial** | Consume/score/sound implemented; external progression table update is deferred. |
+| 6 | `0x6817` | `CollectObjectiveAndAdvanceSequence` | **partial** | Token score/sound, separate helper-letter count and final-letter source activation implemented; original letter HUD graphics remain approximate. |
 | 7 | `0x65DC` | `TransitionObjectAndLaunch` | **implemented** | Transition then low-nibble launch velocity table. |
 | 8 | `0x65B5` | `AirborneOnlyTransition` | **implemented** | Airborne gate, body AABB, transition. |
 | 9 | `0x66CE` | `GroundedOnlyTransition` | **implemented** | Grounded gate, body AABB, transition. |
@@ -20,20 +24,20 @@ Fidelity meanings: **implemented** = the recovered branch is represented with th
 | 11 | `0x6D38` | `OneWayLandingAndOptionalTransition` | **implemented** | Center-X landing, 2px tolerance and low-byte landing counter. |
 | 12 | `0x6DC6` | `LandOnMovingPlatform` | **implemented** | 1px landing tolerance and horizontal platform carry. |
 | 13 | `0x66DC` | `DescendingAirborneTransition` | **implemented** | Airborne + non-negative vertical velocity + AABB. |
-| 14 | `0x667A` | `SecondaryHitboxBossDamage3` | **deferred** | Needs reserved secondary boss hitbox and boss HP state. |
-| 15 | `0x68DE` | `BartActionHitObject` | **implemented** | Uses the reconstructed facing-dependent Bart action line-hitbox (083Ah/0EB7h); low-5-bit hit counter and transition/consume path are active. |
-| 16 | `0x697D` | `SpecialObjectType2RegionTransition` | **implemented** | Reserved type-2/cherry object region gate `Y>=8Eh`, `X=B28h..B60h`, then transition. |
-| 17 | `0x6A07` | `SpecialObjectType4HitTransition` | **partial** | Reserved type-4/rocket point-hit geometry and `velocityX==0` gate implemented; projectile flight remains high-level. |
-| 18 | `0x69AD` | `BartProjectileHitsBoss` | **deferred** | Needs projectile/action object and boss HP state. |
+| 14 | `0x667A` | `SecondaryHitboxBossDamage3` | **implemented** | Registered boss rectangle, three-point damage, defeat gate and helper removal. |
+| 15 | `0x68DE` | `BartActionHitObject` | **implemented** | Uses the reconstructed facing-dependent Bart action line-hitbox (083Ah/0EB7h), low-5-bit hit counter and transition/consume path. |
+| 16 | `0x697D` | `SpecialObjectType2RegionTransition` | **implemented** | Reserved type-2 (cherry-bomb) object region gate Y>=8Eh, X=B28h..B60h and transition. |
+| 17 | `0x6A07` | `SpecialObjectType4HitTransition` | **implemented** | Reserved type-4 rocket point-hit geometry and original stationary velocityX==0 gate. |
+| 18 | `0x69AD` | `BartProjectileHitsBoss` | **implemented** | Type-6 projectile, 8x8 rectangle, one HP damage and defeat latch. |
 | 19 | `0x65C4` | `CollectInvulnerabilityPickup` | **implemented** | Score 50, invulnerability FAh and detach/despawn. |
-| 20 | `0x6E50` | `ExternalCountdownTransition` | **deferred** | Depends on external countdown record pointer. |
+| 20 | `0x6E50` | `ExternalCountdownTransition` | **implemented** | Uses the configured external source record: decrement low flags byte while 8000h is set, then transition when it reaches zero. |
 | 21 | `0x6B87` | `LinkedObjectSpecialTransition` | **deferred** | Depends on linked source pointer and a hard-coded level sequence. |
 | 22 | `0x6E70` | `FeetOnlyDamageOrTransition` | **implemented** | Handler-1 semantics with Bart top shifted down 20px. |
 | 23 | `0x6B47` | `LinkedObjectProximityTransition` | **partial** | Runtime type lookup/proximity is implemented; source-link semantics remain approximate. |
-| 24 | `0x6480` | `SpecialObjectType8HitElseHazard` | **implemented** | Type-8 dart point-hit clears projectile and transitions; miss/no dart follows the event-7 consume fallback. |
+| 24 | `0x6480` | `SpecialObjectType8HitElseHazard` | **implemented** | Type-8 dart point-hit interception clears projectile and transitions; miss follows event-7 consume path. |
 | 25 | `0x6A6D` | `SpecialObjectType10ClearIndexedFlag` | **deferred** | Needs reserved type-10 action object and indexed level-flag table. |
 | 26 | `0x6AC7` | `SpecialObjectType12ClearFlagAndCount` | **deferred** | Needs reserved type-12 action object and level counters. |
-| 27 | `0x5FBD` | `SpecialObjectType14HitElseEvent` | **implemented** | Type-14 slingshot point-hit interception plus the original flags-bit0 event fallback. |
+| 27 | `0x5FBD` | `SpecialObjectType14HitElseEvent` | **implemented** | Type-14 slingshot point-hit interception plus original flags-bit0 event fallback. |
 | 28 | `0x6054` | `FallingLargeObjectHazardOrTopContact` | **implemented** | Falling 48x50 hazard region then handler-3 fallback. |
 | 29 | `0x6086` | `DamageBartIfObjectField2CZero` | **implemented** | Low byte of object +2Ch gates handler 1. |
 | 30 | `0x617B` | `AABBIncrementCounter780IfReady` | **implemented** | 0784/0766/0780 gates and latch update. |
@@ -44,7 +48,7 @@ Fidelity meanings: **implemented** = the recovered branch is represented with th
 | 35 | `0x62DD` | `SpecialObjectType16DestroyAndAdvance` | **deferred** | Needs reserved type-16 object; state-0817 update depends on its hitbox. |
 | 36 | `0x6338` | `MovingPlatformLandingWithDisplacement` | **partial** | DOS Y=-6 landing and +2Ch displacement implemented; +2Ch producer/camera override are approximated. |
 | 37 | `0x63C6` | `MovingHazardDamageOrLandingTransition` | **implemented** | Falling hazard region and stationary descending-feet transition path. |
-| 38 | `0x6258` | `SpecialObjectType8HitElseDamage` | **implemented** | Type-8 dart point-hit clears projectile/transitions; miss uses normal Bart-body damage fallback. |
+| 38 | `0x6258` | `SpecialObjectType8HitElseDamage` | **implemented** | Type-8 dart point-hit interception clears projectile/transitions; miss uses normal Bart-body damage fallback. |
 | 39 | `0x612E` | `SecondaryHitboxStopTargetVelocityX` | **deferred** | Needs secondary hitbox at 089Ah and linked target pointer 079Dh. |
 | 40 | `0x619F` | `ConsumeCounter780AndMarkProgress` | **partial** | Counter/goals/progress loop implemented; progress-source record activation is deferred. |
 | 41 | `0x61F8` | `SecondaryHitboxDamageAndLaunchObject` | **deferred** | Needs secondary hitbox/linked target HP state. |
@@ -56,4 +60,10 @@ The automated `tools/smoke-collision-matrix.mjs` test verifies all 43 indices an
 v0.8 regression-tests zero-height handler-9 clothesline triggers and handler-15 action-hitbox behavior through `tools/smoke-clothesline.mjs` and `tools/smoke-inventory.mjs`.
 
 
-v0.8 also exercises reserved projectile branches for handlers 16/17/24/27/38 through the inventory/action runtime. The current automated fidelity count is **26 implemented / 8 partial / 9 deferred**.
+v0.8 also exercises reserved projectile branches for handlers 16/17/24/27/38 through the inventory/action runtime. The current automated fidelity count is **30 implemented / 7 partial / 6 deferred**.
+
+The arena regression additionally exercises handlers 14 and 18 and the real Nelson death script.
+
+## Current regression evidence
+
+The Level-1 end-gate regression checks retreat while touching a closed gate, then the separate Nelson arena boundary after goals are cleared. The secrets regression checks handler 6 through six actual alien/token chains and handlers 8/14 through Maggie's ball. Rocket tests exercise all six target placements; bomb tests include a hit and a miss. These are isolated scenarios rather than a full route replay.

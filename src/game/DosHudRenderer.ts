@@ -39,7 +39,12 @@ export class DosHudRenderer {
 
     const inv = world.collisionState.inventory;
     const selected = INVENTORY_ITEMS[inv.selectedItem] ?? INVENTORY_ITEMS[1]!;
-    this.text(ctx, selected.name, 56, HUD_Y + 3, zoom, white);
+    // Viewer feedback: selection alone does not mean the glasses are enabled.
+    // Keep this beside the item name so the Maggie letters remain visible.
+    const selectedLabel = selected.id === 1
+      ? `${selected.name} ${inv.alternateGraphicsTimer !== 0 ? "ON" : "OFF"}`
+      : selected.name;
+    this.text(ctx, selectedLabel, 56, HUD_Y + 3, zoom, white);
     this.drawInventoryIcon(ctx, selected.id, 226, HUD_Y + 3, zoom, selected.name, yellow, white);
 
     this.field(ctx, "SCORE", String(world.hud.score).padStart(6, "0"), 56, HUD_Y + 18, zoom, white);
@@ -48,8 +53,13 @@ export class DosHudRenderer {
     this.field(ctx, "GOALS", String(world.hud.goalsRemaining).padStart(2, "0"), 226, HUD_Y + 18, zoom, white);
 
     this.drawLevelMeter(ctx, world, level, zoom, white, blue, yellow);
+    // Readable reconstruction of the six original helper-letter slots.
+    if (level.level === 1) {
+      const letters = "MAGGIE".slice(0, world.helperTokensCollected).padEnd(6, "-");
+      this.text(ctx, letters, 270, HUD_Y + 29, zoom, yellow, 1);
+    }
 
-    if (inv.alternateGraphicsTimer !== 0) this.text(ctx, "XRAY", 274, HUD_Y + 29, zoom, yellow, 1);
+    if (level.level !== 1 && inv.alternateGraphicsTimer !== 0) this.text(ctx, "XRAY", 274, HUD_Y + 29, zoom, yellow, 1);
     const interaction = world.getLevelInteractionOverlay();
     if (interaction?.kind === "shop") this.drawShopPopup(ctx, interaction, zoom, black, blue, white, yellow);
     else if (inv.modeHeld) this.drawInventoryPopup(ctx, world, zoom, black, blue, white, yellow);

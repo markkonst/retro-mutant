@@ -27,6 +27,9 @@ export const INVENTORY_ITEMS: readonly InventoryItemDefinition[] = [
 ];
 
 export interface InventoryEffects {
+  createReservedProjectile?(kind: "rocket" | "cherry-bomb", right: boolean, x: number, y: number): InventoryProjectileRuntime | null;
+  stepReservedProjectile?(projectile: InventoryProjectileRuntime): void;
+  queueSound?(id: number): void;
   setHudEvent(message: string): void;
   addLives(count: number): void;
   addScoreCode(code: number): void;
@@ -128,13 +131,15 @@ export class InventorySystem {
     const action = !!input.action;
     const inv = this.state;
 
-    if (inv.alternateGraphicsTimer > 0 && inv.alternateGraphicsTimer !== 0xfa) {
-      inv.alternateGraphicsTimer = Math.max(0, inv.alternateGraphicsTimer - 1);
-    }
     if (inv.actionCooldown > 0) inv.actionCooldown--;
 
     this.stepProjectiles();
-    if (actionMode !== "suppress-all") this.stepLatchedItemAction();
+    if (actionMode !== "suppress-all") this.stepLatchedItemAction(input);
+    // DOS updates the reserved slot after the action/ignition pass. Let the
+    // same ScriptVm, fractional motion and animation code as ordinary objects
+    // advance bombs and rockets with their original script timing.
+    const projectile = inv.projectile;
+    if (projectile?.active && projectile.scriptRuntime) this.effects.stepReservedProjectile?.(projectile);
 
     // DOS UpdateBartActionAndWeaponState sets g_BartAnimationBase=18h while
     // any of the three FIRE weapons is available, and UpdateBartAnimation
@@ -159,6 +164,9 @@ export class InventorySystem {
 
   /** Inventory selection/use pass: mirrors its later UpdateGameplayTimers slot. */
   endTick(input: BartInputState, suppressed = false): void {
+    // DOS 588Ah decrements DS:07DE before inventory input. FAh is the
+    // initial 250-update duration, not a sentinel for unlimited use.
+    if (this.state.alternateGraphicsTimer > 0) this.state.alternateGraphicsTimer--;
     if (suppressed) return;
     const inventoryHeld = !!(input.down || input.inventory);
     const action = !!input.action;
@@ -343,6 +351,8 @@ export class InventorySystem {
       return;
     }
     this.effects.activateSourceRecord(offset, 0x8000, "set");
+    this.state.lastSoundId = 0x0f;
+    this.effects.queueSound?.(0x0f);
     this.note("WHISTLE sound 0Fh + source activated");
   }
 
@@ -366,6 +376,7 @@ export class InventorySystem {
     const bart = this.player.state;
     inv.actionActive = true;
     inv.lastSoundId = 0x01;
+    this.effects.queueSound?.(0x01);
     // DOS builds the reserved action object at BartY+10. Handler 15 then
     // probes Y+4 and uses facing-dependent X extents around that object.
     const actionObjectX = bart.facing === 0 ? bart.x + 0x10 : bart.x - 0x1e;
@@ -418,28 +429,69 @@ export class InventorySystem {
     this.note(`${kind.toUpperCase()} projectile fired`);
   }
 
-  private stepLatchedItemAction(): void {
+  /**
+   * DOS keeps an item action across ticks in DS:07AD. The low bits select the
+   * action; bit 8000h means its reserved projectile has already been created.
+   * Without this latch, holding FIRE would create another projectile each tick.
+   * State 6 re-arms after a boss shot; ordinary item actions return to zero.
+   */
+  private stepLatchedItemAction(input: BartInputState): void {
     const inv = this.state;
-    if (inv.bartActionState === 2 && !inv.projectile?.active) {
-      const f = this.player.state.facing === 0 ? 1 : -1;
-      const p = createProjectile("cherry-bomb", 0x0002, this.player.state.x + f * 8, this.player.state.y + 12, f * 0x0180, -0x0200, 0x0040, 100);
+    if (inv.bartActionState === 6) {
+      // Positive dispatch table 6FB6h + 6 -> 700Dh. This shot requires
+      // FIRE and right-facing Bart, but consumes no inventory item.
+      if (inv.projectile?.active || !input.action || this.player.state.facing !== 0) return;
+      // 096D:2FEC: frame 0174h/12, vx=0800h, Wait 0027h, Despawn.
+      // Include the VM's startup +8: stepProjectiles already ran this tick.
+      const shot = createProjectile("boss-shot", 6, this.player.state.x + 16,
+        this.player.state.y + 12, 0x0800, 0, 0, 40);
+      shot.descriptorIndex = 0x0174 / 12;
+      inv.projectile = shot;
+      this.spawnTransient(shot, false);
+      inv.bartActionState = 0x8006;
+    } else if (inv.bartActionState === 0x8006) {
+      // Root 7049h: re-arm after the reserved projectile slot becomes free.
+      if (!inv.projectile?.active) inv.bartActionState = 6;
+    } else if (inv.bartActionState === 2 && !inv.projectile?.active) {
+      // 6FC4h: the left-facing bomb starts at BartX, the right one at X+8.
+      // Original scripts own slowing, falling, ground wait and explosion.
+      const right = this.player.state.facing === 0;
+      const p = this.effects.createReservedProjectile?.("cherry-bomb", right,
+        this.player.state.x + (right ? 8 : 0), this.player.state.y + 12);
+      if (!p) {
+        inv.bartActionState = 0;
+        this.note("BOMB script missing: re-export the original DOS assets");
+        return;
+      }
       inv.projectile = p;
       this.spawnTransient(p, false);
       inv.bartActionState = 0x8002;
     } else if (inv.bartActionState === 4 && !inv.projectile?.active && !this.player.state.airborne) {
-      // DOS State04 (7023h): this is NOT a horizontally flying projectile.
-      // InitializeTransientGraphicObject clears all motion fields; the object
-      // stays at Bart +/-10h, Y+10h and its common-overlay graphic animates.
+      // 7058h: place the dormant rocket. Its script waits for ignition;
+      // the later 8004h action path skips Despawn when Bart reaches its fuse.
       const right = this.player.state.facing === 0;
-      const p = createProjectile("rocket", 0x0004, this.player.state.x + (right ? 0x10 : -0x10), this.player.state.y + 0x10, 0, 0, 0, 48);
-      // The four unreferenced Level-1 object frames 4..7 are the decoded
-      // common rocket artwork: two frames for each facing direction.
-      p.descriptorIndex = right ? 4 : 6;
-      p.alternateDescriptorIndex = right ? 5 : 7;
-      p.animationPeriod = 4;
+      const p = this.effects.createReservedProjectile?.("rocket", right,
+        this.player.state.x + (right ? 0x10 : -0x10), this.player.state.y + 0x10);
+      if (!p) {
+        inv.bartActionState = 0;
+        this.note("ROCKET script missing: re-export the original DOS assets");
+        return;
+      }
       inv.projectile = p;
       this.spawnTransient(p, false);
       inv.bartActionState = 0x8004;
+    } else if (inv.bartActionState === 0x8004 && inv.projectile?.scriptRuntime) {
+      const p = inv.projectile;
+      const script = p.scriptRuntime!;
+      const fuseX = this.player.state.x + (this.player.state.facing === 0 ? 8 : -2);
+      if (p.velocityX === 0 && p.x <= fuseX && fuseX <= p.x + 8) {
+        // 70D3h advances SI by one handler word. Only skip the dormant
+        // Despawn; the later explosion also has vx=0 but a different PC.
+        if (script.scriptPC === 0x3008 || script.scriptPC === 0x3040) {
+          script.scriptPC += 2;
+          script.scriptDelay = 0;
+        }
+      }
     } else if ((inv.bartActionState & 0x8000) !== 0 && !inv.projectile?.active) {
       inv.bartActionState = 0;
     }
@@ -448,7 +500,7 @@ export class InventorySystem {
   private stepProjectiles(): void {
     const inv = this.state;
     for (const p of inv.transientObjects) {
-      if (!p.active) continue;
+      if (!p.active || p.scriptRuntime) continue;
       p.velocityY = s16(p.velocityY + p.accelerationY);
       p.x += s16(p.velocityX) >> 8;
       p.y += s16(p.velocityY) >> 8;

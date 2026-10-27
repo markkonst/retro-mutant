@@ -1,5 +1,7 @@
 # Level handlers
 
+Start with the [per-level story and status guides](../../../docs/levels/README.md) and the [handler API reference](../../../docs/LEVEL_HANDLERS.md).
+
 `LevelHandlerRegistry` owns one `LevelHandlerSet` per loaded level. Engine code calls typed methods directly, so IDE reference navigation remains useful.
 
 Level 1 is split by concern under `level1/`:
@@ -12,4 +14,4 @@ Level 1 is split by concern under `level1/`:
 - `Level1PresentationHandlers.ts` — speech-bubble/HUD bindings
 - `Level1Constants.ts` — recovered Level-1-only tables and fixed operands
 
-See `docs/LEVEL_HANDLERS.md` for lifecycle, the modeled Level-1 skateboard/storefront paths, remaining Level-1 branches and the Level 2-5 migration pattern.
+See [LEVEL_HANDLERS.md](../../../docs/LEVEL_HANDLERS.md) for lifecycle, the modeled Level-1 skateboard/storefront paths, remaining Level-1 branches and the Level 2-5 migration pattern.

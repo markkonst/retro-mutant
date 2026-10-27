@@ -39,9 +39,11 @@ export interface CollisionHandlerInfo {
 }
 
 export interface CollisionGameplayEffects {
+  queueSound?(id: number): void;
   addScoreCode(code: number): void;
   addLives(count: number): void;
   decrementGoals(): void;
+  collectHelperToken(): void;
   /** DS:08D6/08D8 configured external countdown source used by handler 20. */
   externalCountdownSourceFlags(): number | null;
   setExternalCountdownSourceFlags(flags: number): void;
@@ -51,6 +53,7 @@ const NOOP_GAMEPLAY_EFFECTS: CollisionGameplayEffects = {
   addScoreCode: () => undefined,
   addLives: () => undefined,
   decrementGoals: () => undefined,
+  collectHelperToken: () => undefined,
   externalCountdownSourceFlags: () => null,
   setExternalCountdownSourceFlags: () => undefined,
 };
@@ -65,7 +68,7 @@ export const COLLISION_HANDLER_INFO: Readonly<Record<number, CollisionHandlerInf
   3: { name: "TopContactBounceBreakOrDamage", dosOffset: 0x66f1, fidelity: "implemented", note: "Feet/top test, break counters, velocity reflection, score and damage path." },
   4: { name: "CollectInventoryResource", dosOffset: 0x6bfd, fidelity: "partial", note: "Inventory BCD counters and known pickup effects implemented; presentation popup is not." },
   5: { name: "ConsumeObjectAndTriggerEvent7", dosOffset: 0x6cec, fidelity: "implemented", note: "Score 100, goal decrement, sound 7 and consume." },
-  6: { name: "CollectObjectiveAndAdvanceSequence", dosOffset: 0x6817, fidelity: "partial", note: "Consume/score/sound implemented; external progression table update is deferred." },
+  6: { name: "CollectObjectiveAndAdvanceSequence", dosOffset: 0x6817, fidelity: "partial", note: "Token score/sound, separate letter counter and helper activation implemented; original HUD glyph layout remains approximate." },
   7: { name: "TransitionObjectAndLaunch", dosOffset: 0x65dc, fidelity: "implemented", note: "Transition then low-nibble launch velocity table." },
   8: { name: "AirborneOnlyTransition", dosOffset: 0x65b5, fidelity: "implemented", note: "Airborne gate, body AABB, transition." },
   9: { name: "GroundedOnlyTransition", dosOffset: 0x66ce, fidelity: "implemented", note: "Grounded gate, body AABB, transition." },
@@ -73,11 +76,11 @@ export const COLLISION_HANDLER_INFO: Readonly<Record<number, CollisionHandlerInf
   11: { name: "OneWayLandingAndOptionalTransition", dosOffset: 0x6d38, fidelity: "implemented", note: "Center-X landing, 2px tolerance and low-byte landing counter." },
   12: { name: "LandOnMovingPlatform", dosOffset: 0x6dc6, fidelity: "implemented", note: "1px landing tolerance and horizontal platform carry." },
   13: { name: "DescendingAirborneTransition", dosOffset: 0x66dc, fidelity: "implemented", note: "Airborne + non-negative vertical velocity + AABB." },
-  14: { name: "SecondaryHitboxBossDamage3", dosOffset: 0x667a, fidelity: "deferred", note: "Needs reserved secondary boss hitbox and boss HP state." },
+  14: { name: "SecondaryHitboxBossDamage3", dosOffset: 0x667a, fidelity: "implemented", note: "Registered boss rectangle, three-point damage, defeat gate and helper removal." },
   15: { name: "BartActionHitObject", dosOffset: 0x68de, fidelity: "implemented", note: "Uses the reconstructed facing-dependent Bart action line-hitbox (083Ah/0EB7h), low-5-bit hit counter and transition/consume path." },
   16: { name: "SpecialObjectType2RegionTransition", dosOffset: 0x697d, fidelity: "implemented", note: "Reserved type-2 (cherry-bomb) object region gate Y>=8Eh, X=B28h..B60h and transition." },
   17: { name: "SpecialObjectType4HitTransition", dosOffset: 0x6a07, fidelity: "implemented", note: "Reserved type-4 rocket point-hit geometry and original stationary velocityX==0 gate." },
-  18: { name: "BartProjectileHitsBoss", dosOffset: 0x69ad, fidelity: "deferred", note: "Needs projectile/action object and boss HP state." },
+  18: { name: "BartProjectileHitsBoss", dosOffset: 0x69ad, fidelity: "implemented", note: "Type-6 projectile, 8x8 rectangle, one HP damage and defeat latch." },
   19: { name: "CollectInvulnerabilityPickup", dosOffset: 0x65c4, fidelity: "implemented", note: "Score 50, invulnerability FAh and detach/despawn." },
   20: { name: "ExternalCountdownTransition", dosOffset: 0x6e50, fidelity: "implemented", note: "Uses the configured external source record: decrement low flags byte while 8000h is set, then transition when it reaches zero." },
   21: { name: "LinkedObjectSpecialTransition", dosOffset: 0x6b87, fidelity: "deferred", note: "Depends on linked source pointer and a hard-coded level sequence." },
@@ -318,9 +321,10 @@ export class CollisionSystem {
     this.effects.addScoreCode(0x10);
     this.sound(ctx.object, 8);
     this.consume(ctx.object, false, "handler 6 objective consumed");
-    this.state.levelProgress0766 = u16(this.state.levelProgress0766 + 1);
-    this.player.noteCollision(`CollectObjectiveAndAdvanceSequence: object #${ctx.object.source.index}`);
-    this.defer(6, "External progression-table/script-PC update after collection is not modeled.");
+    // 6849h uses 07AF/07B1 (helper letters), not the unrelated 0766 index.
+    // It does not decrement the purple-object goal counter.
+    this.effects.collectHelperToken();
+    this.player.noteCollision(`Helper token collected: object #${ctx.object.source.index}`);
     return false;
   }
 
@@ -377,7 +381,23 @@ export class CollisionSystem {
     return false;
   }
 
-  private h14(_ctx: CollisionContext): boolean { return false; } // secondary hitbox only; body AABB would be wrong
+  private h14(ctx: CollisionContext): boolean {
+    // 667Ah builds a secondary rectangle relative to the registered boss.
+    // Type 86 is tested against that rectangle and consumes itself on hit.
+    if (this.state.collisionLatch0784 !== 0) return false;
+    const boss = ctx.objects.find((object) => object.active && object.runtimeId === this.state.linkedTargetRuntimeId079D);
+    if (!boss) return false;
+    const box = this.level.playerConfig.boss_hitbox ?? (this.level.level === 1 ? [0, 32, 0, 32] : null);
+    if (!box) return false;
+    const left = boss.x + box[0]!;
+    const top = boss.y + box[2]!;
+    if (!this.testAabbWithBartRect(ctx.object, ctx.profile,
+      { left, right: left + box[1]!, top, bottom: top + box[3]! })) return false;
+    this.state.bossHitPoints = s16(this.state.bossHitPoints - 3);
+    if (this.state.bossHitPoints <= 0) this.state.collisionLatch0784 = 0xff;
+    this.consume(ctx.object, false, "Boss helper hit: three damage points");
+    return false;
+  }
 
   private h15(ctx: CollisionContext): boolean {
     const action = this.state.inventory.actionHitbox;
@@ -419,7 +439,19 @@ export class CollisionSystem {
     return false;
   }
 
-  private h18(_ctx: CollisionContext): boolean { return false; } // reserved type-6 projectile + boss HP still deferred
+  private h18(ctx: CollisionContext): boolean {
+    // 69ADh: an 8x8 type-6 projectile rectangle, never Bart's body.
+    const projectile = this.state.inventory.projectile;
+    if (this.state.collisionLatch0784 !== 0 || !projectile?.active || projectile.typeOffset !== 6) return false;
+    const shot = { left: projectile.x, right: projectile.x + 8,
+      top: projectile.y, bottom: projectile.y + 8 };
+    if (!this.testAabbWithBartRect(ctx.object, ctx.profile, shot)) return false;
+    this.state.bossHitPoints = u16(this.state.bossHitPoints - 1);
+    this.state.collisionLatch0784 = this.state.bossHitPoints === 0 ? 0xff : 0;
+    this.clearProjectile();
+    this.player.noteCollision(`Boss projectile hit: ${this.state.bossHitPoints} HP remaining`);
+    return false;
+  }
 
   private h19(ctx: CollisionContext): boolean {
     if (!this.testAabb(ctx.object, ctx.profile)) return false;
@@ -669,6 +701,12 @@ export class CollisionSystem {
     if (!this.testAabb(object, profile)) return;
     const bart = this.player.state;
     const rect = objectRect(object, profile);
+    const current = bartRect(this.player);
+    // The shared DOS overlap test includes touching edges. At a wall, the
+    // first reverse step may be fractional (no whole-pixel displacement yet).
+    // Preserve that outward velocity so Bart can accelerate away next tick.
+    if (current.right <= rect.left && bart.velocityX <= 0) return;
+    if (current.left >= rect.right && bart.velocityX >= 0) return;
     const previousLeft = previousBart.x + 2;
     const previousRight = previousLeft + 12;
     if (previousRight <= rect.left) bart.x = rect.left - 14;
@@ -830,6 +868,7 @@ export class CollisionSystem {
 
   private sound(object: GameObjectRuntime, soundId: number): void {
     object.lastSoundId = soundId & 0xffff;
+    this.effects.queueSound?.(soundId);
   }
 
   private defer(index: number, reason: string): void {

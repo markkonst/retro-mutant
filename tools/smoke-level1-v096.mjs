@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { RuntimeWorld } from "../wwwroot/js/game/RuntimeWorld.js";
+import { createXrayPalette, applyXrayPalette } from "../wwwroot/js/game/XrayPalette.js";
 
 const root=resolve(fileURLToPath(new URL("..",import.meta.url)));
 function loadLevel(n){
@@ -74,8 +75,34 @@ xrayWorld.tick(no);
 const normalDescriptor=xrayObject.descriptorIndex;
 xrayWorld.collisionState.inventory.selectedItem=1;
 xrayWorld.tick({...no,down:true});xrayWorld.tick(no);xrayWorld.tick(no);
-if(xrayWorld.collisionState.inventory.alternateGraphicsTimer!==0xfa)throw new Error("X-RAY toggle did not set 07DE=FAh");
+if(xrayWorld.collisionState.inventory.alternateGraphicsTimer!==0xf9)throw new Error("X-RAY must count down from FAh on the following update");
 if(normalDescriptor===null||xrayObject.descriptorIndex!==normalDescriptor+6)throw new Error(`X-RAY descriptor shift wrong: ${normalDescriptor} -> ${xrayObject.descriptorIndex}`);
+
+// The bank exported from EXE +B8h changes the blue sky to brown/orange.
+// Check every original palette entry, not a hand-picked CSS tint.
+const paletteRuntime = xrayWorld.level.manifest.runtime;
+const replacements = createXrayPalette(paletteRuntime);
+for (let i = 0; i < 16; i++) {
+  const original = paletteRuntime.palette_A.rgb6[i].map(v => Math.round(v * 255 / 63));
+  const expected = paletteRuntime.palette_B.rgb6[i].map(v => Math.round(v * 255 / 63));
+  const pixel = new Uint8ClampedArray([...original, 123]);
+  applyXrayPalette(pixel, replacements);
+  if (pixel.slice(0, 3).some((v, j) => v !== expected[j]) || pixel[3] !== 123)
+    throw new Error(`X-RAY palette entry ${i} or alpha is incorrect`);
+}
+const sky = new Uint8ClampedArray([69, 174, 251, 255]);
+applyXrayPalette(sky, replacements);
+if (String(sky) !== "174,105,0,255") throw new Error("Original orange/brown sky was not restored");
+for (let i = 0; i < 248; i++) xrayWorld.tick(no);
+if (xrayWorld.collisionState.inventory.alternateGraphicsTimer !== 1) throw new Error("X-RAY expired before 250 updates");
+xrayWorld.tick(no);
+if (xrayWorld.collisionState.inventory.alternateGraphicsTimer !== 0) throw new Error("X-RAY did not expire after 250 updates");
+xrayWorld.tick(no); // Object drawing is resolved before the end-of-tick timer pass.
+const restored = xrayWorld.debugEnsureSourceLoaded(29);
+if (restored) {
+  xrayWorld.tick(no);
+  if (restored.descriptorIndex !== Math.trunc(restored.renderOffset / 12)) throw new Error("Alien sprite bank did not restore");
+}
 
 // Rocket item 5 creates the stationary type-4 reserved action object. It must
 // use recovered rocket frames instead of the old moving yellow square.
@@ -84,8 +111,8 @@ rocketWorld.collisionState.inventoryCounts[5]=0x01;rocketWorld.collisionState.in
 rocketWorld.tick({...no,down:true});rocketWorld.tick(no);rocketWorld.tick(no);
 const rocket=rocketWorld.collisionState.inventory.projectile;
 if(!rocket||rocket.kind!=="rocket"||rocket.typeOffset!==0x0004)throw new Error("ROCKET action did not create type-4 reserved object");
-if(rocket.velocityX!==0||rocket.velocityY!==0||rocket.accelerationY!==0)throw new Error(`ROCKET must be stationary: ${rocket.velocityX}/${rocket.velocityY}/${rocket.accelerationY}`);
-if(rocket.descriptorIndex!==4||rocket.alternateDescriptorIndex!==5)throw new Error(`ROCKET right-facing frames wrong: ${rocket.descriptorIndex}/${rocket.alternateDescriptorIndex}`);
+if(rocket.velocityX!==0||rocket.velocityY!==0||rocket.accelerationY!==0)throw new Error(`ROCKET must initially be stationary: ${rocket.velocityX}/${rocket.velocityY}/${rocket.accelerationY}`);
+if(rocket.descriptorIndex!==12||!rocket.scriptRuntime)throw new Error(`ROCKET right-facing frames wrong: ${rocket.descriptorIndex}/${rocket.alternateDescriptorIndex}`);
 
 // Once the goal barricade is gone, Nelson source #125 can stream. His first
 // instruction enters the DOS boss camera state: left bound 30B7h and max

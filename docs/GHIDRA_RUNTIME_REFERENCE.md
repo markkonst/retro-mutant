@@ -1,5 +1,7 @@
 # Ghidra runtime reference used by v0.6
 
+[Documentation home](README.md)
+
 This project was built against the current Ghidra listing supplied on 2026-08-31.
 
 ## Object update sequence

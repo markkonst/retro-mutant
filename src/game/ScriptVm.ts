@@ -20,6 +20,7 @@ export interface NativeCallResult {
 }
 
 export interface ScriptVmEffects {
+  queueSound(id: number): void;
   decrementObjectiveCounter(): void;
   getBartX(): number;
   detachSource(object: GameObjectRuntime): void;
@@ -143,6 +144,7 @@ export class ScriptVm {
 
         case "PlaySound":
           object.lastSoundId = u16(numberArg(instruction, "sound_id"));
+          this.effects.queueSound?.(object.lastSoundId);
           object.scriptPC = nextPc;
           this.trace(object, instruction, tick, "executed", `sound=${this.hex(object.lastSoundId, 2)}`);
           break;
@@ -247,6 +249,7 @@ export class ScriptVm {
 
         case "TriggerGlobalEventSound4":
           object.lastSoundId = 4; object.scriptPC = nextPc;
+          this.effects.queueSound?.(4);
           this.trace(object, instruction, tick, "executed", "sound=04h");
           break;
 

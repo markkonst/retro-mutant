@@ -28,7 +28,7 @@ export class BartPlayer {
   private actionConsumedThisTick = false;
   private debugInvulnerable = false;
 
-  constructor(private readonly level: LoadedLevel) {
+  constructor(private readonly level: LoadedLevel, private readonly queueSound: (id: number) => void = () => {}) {
     const config = level.playerConfig;
     this.state = {
       x: config.start_x,
@@ -285,6 +285,7 @@ export class BartPlayer {
     bart.blinkPhase = 0;
     bart.invulnerabilityTimer = 0x64;
     bart.hitDeathTimer = 0x32;
+    this.queueSound(0x0a); // root EXE hit/death sound command
     bart.renderVisible = true;
     this.noteCollision(message);
     return true;
@@ -360,6 +361,7 @@ export class BartPlayer {
       this.jumpLatch = true;
       bart.airborne = true;
       bart.jumpHoldCounter = 7;
+      this.queueSound(3); // root 507Bh: sound only when a jump actually starts
       bart.velocityY = s16(0xfc00); // -4.0 px/tick
       bart.idleTimer = 0;
       bart.supportKind = "none";

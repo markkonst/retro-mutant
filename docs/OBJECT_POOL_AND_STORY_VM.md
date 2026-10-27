@@ -1,4 +1,6 @@
-# Object pool, story VM and live inspector — v0.9.0
+# Object pool, story VM and live inspector
+
+[ScriptVM guide](scriptvm/README.md) · [Level-1 story](levels/level1/README.md)
 
 ## 28 runtime slots
 

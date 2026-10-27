@@ -85,6 +85,10 @@ export interface ManifestJson {
       adapter_map: number[];
       rgb6: number[][];
     };
+    palette_B?: {
+      adapter_map: number[];
+      rgb6: number[][];
+    };
   };
 }
 
@@ -137,6 +141,17 @@ export interface BartPlayerConfig {
   initial_animation_reload: number;
   /** LevelRuntimeConfig +0Eh, copied by DOS init to g_GoalsRemainingBCD. */
   initial_goals_bcd: number;
+  /** LevelRuntimeConfig +28h/+2Ah: live boss HP and respawn HP (DS:0896/0898). */
+  boss_hit_points?: number;
+  /** DS:07AF/07B1 count the helper letters, separately from level progress. */
+  helper_token_count?: number;
+  /** LevelRuntimeConfig +70h: source enabled upon collecting the final letter. */
+  helper_source_offset?: number;
+  /** Reserved weapon scripts are not entries in the normal object type table. */
+  reserved_action_scripts?: Record<string, ObjectTypeFlow>;
+  boss_respawn_hit_points?: number;
+  /** +2Ch..32h: x offset, width, y offset, height relative to the registered boss. */
+  boss_hitbox?: [number, number, number, number];
   /** Recovered LevelRuntimeConfig source pointers used by inventory/global mechanics. */
   goal_gate_source_offset?: number;
   progress_source_offset?: number;
@@ -165,7 +180,7 @@ export interface InventoryItemDefinition {
 
 export interface InventoryProjectileRuntime {
   active: boolean;
-  kind: "cherry-bomb" | "rocket" | "donut" | "slingshot" | "dart";
+  kind: "cherry-bomb" | "rocket" | "donut" | "slingshot" | "dart" | "boss-shot";
   typeOffset: number;
   x: number;
   y: number;
@@ -173,6 +188,8 @@ export interface InventoryProjectileRuntime {
   velocityY: number;
   accelerationY: number;
   lifetime: number;
+  /** Original script state for reserved-slot actions such as rockets. */
+  scriptRuntime?: GameObjectRuntime;
   /** Optional decoded object-frame surrogate for a DOS common-overlay graphic. */
   descriptorIndex?: number;
   /** Optional second frame used by the common-overlay animation. */
@@ -278,6 +295,8 @@ export interface CollisionGlobalRuntime {
   specialCounter0780: number;
   /** DS:0784 special collision/boss latch. */
   collisionLatch0784: number;
+  /** DS:0896, decremented by projectile/helper boss collision handlers. */
+  bossHitPoints: number;
   /** High-level runtime-id equivalent of the DS:079D linked/boss object pointer. */
   linkedTargetRuntimeId079D: number | null;
   /** DS:0813 level-specific hit/progression counter. */

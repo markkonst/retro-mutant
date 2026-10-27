@@ -1,8 +1,49 @@
+## Unreleased
+
+- Play the original PC-speaker SFX through a validated local BUZZER.OVL import and Web Audio; add a sound toggle and event callbacks.
+- Recover Level-1 arena action state 6, its reserved projectile, Nelson HP and boss/helper collisions; test the real death script through level completion.
+- Export boss HP/rectangle fields from the original level config.
+- Expand dense runtime/Level-1 code and add a beginner's guide with explicit fidelity limits. Roland/MT-32 output and full Level-1 parity remain open.
+
 # Changelog
+
+## Level-1 story chains
+
+- Recover Maggie activation from six alien tokens using 07AF/07B1 and the original helper source; verify her ball deals three damage to Nelson.
+- Test the complete 400/200 cinema passer-by spray transitions and the Jebediah rocket/bird/message sequence.
+- Show collected MAGGIE letters and the original statue message on the canvas with reconstructed presentation. Separate cinema visits and head-jumping rewards remain unproven.
+
+
+## End-of-level gate retreat
+
+- Preserve outward fractional velocity when Bart touches a solid edge, fixing the closed Level-1 gate trapping him.
+- Test walking to and away from the closed gate, and the original Nelson arena boundary after clearing objectives.
+
+
+## Readable sound assets
+
+- Extract PC-speaker tone records and named AdLib data fields to versioned JSON; browser playback uses JSON only.
+- Preserve DOS addresses, instrument parameters, phrase pointers and note/control stream annotations for contributors.
+- Validate JSON layouts and compare JSON-driven AdLib playback to 10,000 original x86 service ticks.
+
+
+## Item and story regression audit
+
+- Replace approximate cherry-bomb physics with original left/right reserved scripts, including ground wait and explosion frames.
+- Test all eight Grandpa coin spawns, whistle location bounds, sound and one-shot departure, plus bomb target hit/miss and 400/200 passer-by time gates.
+- Document that cinema entry/bonus-show behavior remains unresolved; timed passer-by behavior is not a completed cinema feature.
+
+## AdLib and rocket reconstruction
+
+- Translate ADLIB.OVL music/effect sequencing and render it through an attributed OPL emulator; retain selectable PC-speaker sound.
+- Verify the sequencer against original x86 execution for 10,000 ticks, including music restart and all effect IDs.
+- Run original reserved rocket scripts for fuse ignition, signed flight, acceleration, explosion and expiry; verify hits on all six Level-1 targets.
+- Add readable audio documentation and reproducible regression commands. Level 1 is still not certified complete.
+
 
 ## 0.9.6 - Level-1 paint states, X-Ray, storefront visuals and Nelson gate
 
-- Implemented `ExternalSpecial3Bytes` as live runtime state instead of a viewer no-op. Level 1 now reproduces the altered `04 0A 06` background-palette state for the sprayable poster T38→T39 and the wrench/water awning T73→T74, recoloring the local purple DOS background art red.
+- Implemented `ExternalSpecial3Bytes` as live runtime state instead of a viewer no-op. Level 1 now reproduces the altered `04 0A 06` background-palette state for the sprayable poster T38â†’T39 and the wrench/water awning T73â†’T74, recoloring the local purple DOS background art red.
 - Implemented collision handler 20 (`6E50h`) against the configured external countdown source. WRENCH now arms source #27 at `803Fh`; its low byte counts down and T73 transitions to T74 when it reaches zero.
 - Reconstructed T90 as the timer-400/200 controller: it spawns T91, whose decoded six-frame `D209..D214` sequence moves at `VX=-0140h`, `VY=0100h` before continuing horizontally.
 - Replaced the yellow moving ROCKET placeholder with the recovered stationary type-4 reserved action object and decoded Level-1 rocket frames 4..7.
@@ -35,7 +76,7 @@
 ## 0.9.3 - Level-1 skateboard player path
 
 - Reconstructed `LevelSpecificPlayer_Level1` skateboard-zone ownership for `0x0D6C <= BartX < 0x2180` under `src/game/levels/level1/`.
-- Implemented the recovered `UpdateBartSkateboardPhysics` input latches, push/impulse animation state, `±0x0800` speed clamp, 8.8 X integration, facing gate, camera band and skateboard descriptor families (`0x40` / spray-can `0x5A`).
+- Implemented the recovered `UpdateBartSkateboardPhysics` input latches, push/impulse animation state, `Â±0x0800` speed clamp, 8.8 X integration, facing gate, camera band and skateboard descriptor families (`0x40` / spray-can `0x5A`).
 - Added the DOS gameplay `02h` down input separately from inventory mode so grounded `FIRE+up/down` can adjust the skateboard base-Y clamp (`0x72..0x80`) without a Level-1 input hack.
 - Skateboard entry now disables source #53/#83 (type 61) and exit restores their `8000h` source-active bit; clearing a persistent source-active bit generically releases a resident runtime slot to avoid ghost scripts/colliders.
 - Added typed runtime bridges for shared Bart jump, terrain, descriptor refresh and camera access plus a dedicated skateboard smoke regression.
@@ -83,13 +124,13 @@
 ## 0.7.0
 
 - Fixed DOS zero-height collision profiles: line colliders are now valid instead of being rejected by the generic AABB helper.
-- Fixed the two Level-1 clothesline sheets: grounded Bart contact transitions type 63 → 64, starts the falling animation/`+0x0100` Y motion and settles as type 65; negative transition score/event/goal side effects are wired.
+- Fixed the two Level-1 clothesline sheets: grounded Bart contact transitions type 63 â†’ 64, starts the falling animation/`+0x0100` Y motion and settles as type 65; negative transition score/event/goal side effects are wired.
 - Added a recovered 14-slot `InventorySystem` with packed-BCD counts, selector repeat/timeout state and the DOS item-use dispatch model.
 - Added X-ray toggle, coin/wrench/magnet/whistle source gates, cherry-bomb/rocket/donut transient actions, key teleport and pause behavior.
 - Added spray, slingshot and dart-gun FIRE paths with recovered ammo/submeter behavior.
 - Implemented collision handler 15 against Bart's separate facing-dependent action hitbox instead of body AABB fallback.
 - Added the recovered per-level inventory/progress source pointers to `player_runtime.json`.
-- Added a 320×200 DOS-style Canvas composition and an original 8×8 font extracted from `VGA.OVL` for HUD text/numbers.
+- Added a 320Ã—200 DOS-style Canvas composition and an original 8Ã—8 font extracted from `VGA.OVL` for HUD text/numbers.
 - Added runtime HUD rendering for score/lives/time/goals, selected inventory/count and level-specific meters; the previous modern HUD is now an optional debug overlay.
 - Added clothesline and inventory regression smoke tests.
 - Common `GENERAL.OVL` inventory icon rasters and several transient weapon/item graphics remain non-pixel-exact; v0.7 uses compact DOS-font/pixel symbols while preserving the recovered icon metadata offsets.
@@ -129,7 +170,7 @@
 
 ## 0.4.0
 
-- Added `CollisionSystem` using the recovered Bart 12×24 hitbox and per-type `CollisionProfile` data.
+- Added `CollisionSystem` using the recovered Bart 12Ã—24 hitbox and per-type `CollisionProfile` data.
 - Added StaticTerrain landing/spring behavior.
 - Added horizontal solids, one-way/moving platforms, bounce objects and physical hazard/top-contact paths.
 - Added handler-1 damage/invulnerability core and safe direct pickups/transitions.

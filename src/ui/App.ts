@@ -1,3 +1,6 @@
+import { DebugWorkbench } from "../debug/DebugWorkbench.js";
+import { Level1DebugTools } from "../debug/Level1DebugTools.js";
+import { BrowserSound } from "../game/audio/BrowserSound.js";
 import { AssetRepository } from "../game/AssetRepository.js";
 import { COLLISION_HANDLER_NAMES, getCollisionHandlerInfo } from "../game/CollisionSystem.js";
 import { RuntimeWorld } from "../game/RuntimeWorld.js";
@@ -38,11 +41,17 @@ const EATMYSHORTS_CODES = ["NumpadSubtract", "KeyE", "KeyA", "KeyT", "KeyM", "Ke
 
 export class App {
   private readonly repository = new AssetRepository();
+  private readonly sound = new BrowserSound();
+  private readonly soundDriver = requiredElement<HTMLSelectElement>("sound-driver");
+  private readonly soundButton = requiredElement<HTMLButtonElement>("sound-button");
   private readonly viewer: WorldViewer;
   private readonly loop: SimulationLoop;
   private world: RuntimeWorld | null = null;
   private loadingGeneration = 0;
   private selectedObject: GameObjectRuntime | null = null;
+  private selectedSlot: number | null = null;
+  private readonly workbench: DebugWorkbench;
+  private readonly debugTools = new Level1DebugTools();
   private selectedBart = false;
   private bartInput: BartInputState = { left: false, right: false, jump: false, down: false, action: false, inventory: false };
   private debugInvulnerable = false;
@@ -84,11 +93,23 @@ export class App {
     this.viewer = new WorldViewer(requiredElement<HTMLCanvasElement>("world-canvas"));
     this.viewer.setSelectionListener(({ object, bart }) => {
       this.selectedObject = object;
+      this.selectedSlot = object?.slotIndex ?? null;
       this.selectedBart = bart !== null;
       if (bart) this.updateBartInspector(bart);
       else this.updateObjectInspector(object);
     });
     this.viewer.setCameraListener(() => this.updateCameraControls());
+    this.workbench = new DebugWorkbench(
+      requiredElement("debug-presets"), requiredElement("object-slots"),
+      requiredElement<HTMLCanvasElement>("object-preview"), requiredElement("object-preview-caption"),
+      slot => {
+        this.viewer.clearSelection();
+        this.selectedSlot = slot;
+        this.selectedObject = this.world?.getObjectBySlot(slot) ?? null;
+        this.render();
+      },
+      id => this.runDebugPreset(id),
+    );
 
     this.loop = new SimulationLoop(
       () => this.tick(),
@@ -144,6 +165,8 @@ export class App {
 
   private tick(): void {
     this.world?.tick(this.bartInput);
+    const soundId = this.world?.consumeSoundCommand();
+    if (soundId !== null && soundId !== undefined && !document.hidden) this.sound.queue(soundId);
     if (this.world?.levelFinished) {
       this.handleLevelFinished();
       return;
@@ -177,14 +200,59 @@ export class App {
     this.updateHud();
     if (this.selectedBart && this.world) {
       this.updateBartInspector(this.world.bart);
-    } else if (this.selectedObject) {
-      const current = this.world?.getObjectBySourceIndex(this.selectedObject.source.index) ?? null;
+    } else if (this.selectedSlot !== null) {
+      // Follow the physical slot, including transient children and reuse.
+      const current = this.world?.getObjectBySlot(this.selectedSlot) ?? null;
       this.selectedObject = current;
       this.updateObjectInspector(current);
+    }
+    this.workbench.refresh(this.world, this.selectedSlot, this.selectedBart);
+  }
+
+  private runDebugPreset(id: string): void {
+    if (!this.world || this.levelSelect.disabled) return;
+    try {
+      this.clearBartInput();
+      this.levelAdvancePending = false;
+      this.sound.silence();
+      const message = this.debugTools.apply(this.world, id);
+      this.viewer.clearSelection();
+      // One ordinary update populates the new streaming window. No story
+      // scripts or private game routines are invoked by the debug layer.
+      this.tick();
+      this.viewer.setCameraX(this.world.bart.x - 0x88);
+      this.updateCameraControls();
+      this.status.textContent = message;
+      this.render();
+      requiredElement<HTMLCanvasElement>("world-canvas").focus();
+    } catch (error) {
+      this.status.textContent = error instanceof Error ? error.message : String(error);
     }
   }
 
   private installUiHandlers(): void {
+    this.soundDriver.addEventListener("change", () => {
+      this.sound.disable();
+      this.soundButton.textContent = "Sound: off";
+      this.soundButton.setAttribute("aria-pressed", "false");
+    });
+    this.soundButton.addEventListener("click", async () => {
+      this.soundButton.disabled = true;
+      try {
+        if (this.sound.enabled) this.sound.disable();
+        else await this.sound.enable(this.soundDriver.value as "adlib" | "buzzer");
+        this.soundButton.textContent = this.sound.enabled ? `Sound: ${this.sound.backendLabel}` : "Sound: off";
+        this.soundButton.setAttribute("aria-pressed", String(this.sound.enabled));
+      } catch (error) {
+        this.sound.disable();
+        this.status.textContent = error instanceof Error ? error.message : String(error);
+      } finally {
+        this.soundButton.disabled = false;
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      this.sound.setHidden(document.hidden);
+    });
     this.levelSelect.addEventListener("change", () => {
       void this.loadLevel(Number(this.levelSelect.value) as LevelNumber);
     });
@@ -422,6 +490,7 @@ export class App {
   }
 
   private updatePlayButton(): void {
+    this.sound.setPlaying(this.loop.isRunning());
     this.playButton.textContent = this.loop.isRunning() ? "Pause" : "Play";
   }
 
@@ -542,7 +611,6 @@ export class App {
         <dt>Sprite offset</dt><dd>${descriptor ? `${descriptor.x_offset}, ${descriptor.y_offset}` : "—"}</dd>
       </dl>
       <p class="ok">Player control + collision core ${this.world?.areCollisionsEnabled() ? "actief" : "uitgeschakeld"}.</p>
-      <p class="muted">Actief: StaticTerrain landing/springs, 12×24 Bart hitbox, object AABB, horizontal solids, one-way/moving platforms, bounce/hazard core, damage + DOS blink/invulnerability, DOS HUD lives/score/time/goals, 14-slot inventory, item-use state, spray action-hitbox, weapon meters/projectiles, bewezen pickups en veilige type-transitions. Boss/linked-object side-effects blijven geparkeerd waar hun globale state nog ontbreekt.</p>
     `;
   }
 
@@ -552,6 +620,10 @@ export class App {
       return;
     }
 
+    if (!object.active) {
+      this.inspector.innerHTML = `<h3>Slot ${object.slotIndex} · free</h3><p class="muted">This slot is not loaded. Selection follows its next occupant.</p>`;
+      return;
+    }
     const descriptor = object.descriptor;
     const collision = object.collision;
     const handlerInfo = collision ? getCollisionHandlerInfo(collision.collision_index) : null;
@@ -598,6 +670,13 @@ export class App {
         <dt>Source</dt><dd>${object.sourceAttached ? `#${object.source.index} @ ${hex(object.source.offset)}` : `transient (${object.source.index})`}</dd>
         <dt>Type</dt><dd>${object.typeId} (${hex(object.typeOffset)})</dd>
         <dt>Source start</dt><dd>${object.source.x}, ${object.source.y}</dd>
+        <dt>Stream X / flags</dt><dd>${object.source.stream_x} / ${hex(object.source.flags)}</dd>
+        <dt>Runtime ID</dt><dd>${object.runtimeId} · active ${object.active}</dd>
+        <dt>Fractions X/Y</dt><dd>${object.fractionX}, ${object.fractionY}</dd>
+        <dt>Link +2A / motion +2C</dt><dd>${hex(object.linkField2A)} / ${object.motionReferenceX}</dd>
+        <dt>Render offset</dt><dd>${hex(object.renderOffset)}</dd>
+        <dt>Special render bytes</dt><dd>${object.specialRenderBytes?.map(v => hex(v, 2)).join(" ") ?? "—"}</dd>
+        <dt>Sprite geometry</dt><dd>${descriptor ? `${descriptor.width_pixels}×${descriptor.height_pixels} · offset ${descriptor.x_offset},${descriptor.y_offset} · sheet ${descriptor.source_x},${descriptor.source_y}` : "No descriptor"}</dd>
         <dt>Runtime X/Y</dt><dd>${object.x}, ${object.y}</dd>
         <dt>Flags</dt><dd>${hex(object.flags)} / runtime ${hex(object.runtimeFlags)}</dd>
         <dt>Script entry</dt><dd>${object.flow ? hex(object.flow.entry_offset) : "—"}</dd>

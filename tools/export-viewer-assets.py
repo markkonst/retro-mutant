@@ -9,11 +9,28 @@ import json
 import shutil
 import tempfile
 from pathlib import Path
-from simpsons_ovl_assets import SimpsonsAssets, export_assets, LEVEL_DATA_SEGMENTS
+from simpsons_ovl_assets import SimpsonsAssets, export_assets, LEVEL_DATA_SEGMENTS, _decode_object_script_flow, _flow_to_json
 
 
 def write_json(path, value):
     path.write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
+
+
+def reserved_action_scripts(exe):
+    """Include both paths: ignition skips the dormant Despawn instruction.
+    Ordinary object-type CFG discovery cannot reach these reserved-slot scripts.
+    """
+    scripts = {}
+    for name, entry, launch in [('rocket_right', 0x2FFA, 0x300A), ('rocket_left', 0x3032, 0x3042)]:
+        paths = [_flow_to_json(_decode_object_script_flow(exe, 1, 0x96D0, 0x32B0, 2, pc, 256)) for pc in (entry, launch)]
+        data = paths[0]
+        instructions = {i['pc']: i for path in paths for i in path['instructions']}
+        data['instructions'] = sorted(instructions.values(), key=lambda i: i['pc'])
+        data['edges'] = [e for path in paths for e in path['edges']]
+        scripts[name] = data
+    for name, entry in [('bomb_right', 0x2F9C), ('bomb_left', 0x2FD2)]:
+        scripts[name] = _flow_to_json(_decode_object_script_flow(exe, 1, 0x96D0, 0x32B0, 1, entry, 256))
+    return scripts
 
 
 def export(source, destination):
@@ -43,12 +60,19 @@ def export(source, destination):
                 'ground_y_default': word(0x0A), 'start_x': word(0x0C),
                 'variant': word(0x0E), 'initial_max_speed_x_fixed_8_8': 512,
                 'initial_animation_reload': 3, 'initial_goals_bcd': word(0x0E),
+                'boss_hit_points': word(0x28),
+                # 2F4Bh initializes the letter sequence; 6817h collects tokens.
+                'helper_token_count': int.from_bytes(exe[0x80F0 + 0x6A3 + n * 16 + 2:0x80F0 + 0x6A3 + n * 16 + 4], 'little'),
+                'helper_source_offset': word(0x70),
+                'boss_respawn_hit_points': word(0x2A),
+                'boss_hitbox': [word(o) for o in (0x2C, 0x2E, 0x30, 0x32)],
                 'progress_source_offset': word(0x58),
                 'inventory_item8_source_offset': word(0x64),
                 'inventory_item6_source_offset': word(0x68),
             }
             if n == 1:
                 player['goal_gate_source_offset'] = word(0x54)
+                player['reserved_action_scripts'] = reserved_action_scripts(exe)
             write_json(level / 'player_runtime.json', player)
             messages = []
             # Recovered message banks, including native-selected prank calls.

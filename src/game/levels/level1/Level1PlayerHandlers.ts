@@ -1,5 +1,9 @@
 import type { BartInputState } from "../../types.js";
-import type { LevelPlayerStepEvent, LevelPlayerStepResult, LevelRuntimeServices } from "../LevelHandlers.js";
+import type {
+  LevelPlayerStepEvent,
+  LevelPlayerStepResult,
+  LevelRuntimeServices,
+} from "../LevelHandlers.js";
 import type { Level1ShopHandlers } from "./Level1ShopHandlers.js";
 import {
   LEVEL1_SKATEBOARD_BOUNDARY_LEFT_SOURCE_OFFSET,
@@ -8,9 +12,17 @@ import {
   LEVEL1_SKATEBOARD_MIN_X,
 } from "./Level1Constants.js";
 
-function u16(value: number): number { return value & 0xffff; }
-function s16(value: number): number { const v=value&0xffff; return (v&0x8000)!==0?v-0x10000:v; }
-function s8(value: number): number { const v=value&0xff; return (v&0x80)!==0?v-0x100:v; }
+function u16(value: number): number {
+  return value & 0xffff;
+}
+function s16(value: number): number {
+  const v = value & 0xffff;
+  return (v & 0x8000) !== 0 ? v - 0x10000 : v;
+}
+function s8(value: number): number {
+  const v = value & 0xff;
+  return (v & 0x80) !== 0 ? v - 0x100 : v;
+}
 
 /**
  * Level-1 player state outside the object VM.
@@ -26,13 +38,16 @@ function s8(value: number): number { const v=value&0xff; return (v&0x80)!==0?v-0
 export class Level1PlayerHandlers {
   private skateboardActive = false;
   private rightLatch = false; // DS:084C
-  private leftLatch = false;  // DS:084D
+  private leftLatch = false; // DS:084D
   private skateboardImpulse = 0; // DS:084E
   private skateboardAnimState = 0; // DS:0850
   private fractionX = 0; // low-byte accumulator at DS:082C
   private brakeVisual = false; // per-tick role of DS:0853
 
-  constructor(private readonly services: LevelRuntimeServices, private readonly shop: Level1ShopHandlers) {}
+  constructor(
+    private readonly services: LevelRuntimeServices,
+    private readonly shop: Level1ShopHandlers,
+  ) {}
 
   reset(): void {
     this.skateboardActive = false;
@@ -52,16 +67,30 @@ export class Level1PlayerHandlers {
     // skips the normal Bart update and suppresses the action/weapon routine.
     if (this.shop.active) {
       this.shop.step(event.input);
-      return { continueGenericBartUpdate: false, bartActionMode: "suppress-all", suppressInventorySelection: true };
+      return {
+        continueGenericBartUpdate: false,
+        bartActionMode: "suppress-all",
+        suppressInventorySelection: true,
+      };
     }
 
-    const inSkateboardZone = bart.x >= LEVEL1_SKATEBOARD_MIN_X && bart.x < LEVEL1_SKATEBOARD_MAX_X;
+    const inSkateboardZone =
+      bart.x >= LEVEL1_SKATEBOARD_MIN_X && bart.x < LEVEL1_SKATEBOARD_MAX_X;
 
     if (!inSkateboardZone) {
       if (this.skateboardActive) this.leaveSkateboardMode();
       if (this.shop.tryEnter(event.input)) {
-        return { continueGenericBartUpdate: false, bartActionMode: "suppress-all", suppressInventorySelection: true };
+        return {
+          continueGenericBartUpdate: false,
+          bartActionMode: "suppress-all",
+          suppressInventorySelection: true,
+        };
       }
+      // Root 3A06h..3A19h: entering Nelson's arena supplies action state 6.
+      // Preserve an item action already in progress.
+      const inventory = this.services.collisionState.inventory;
+      if (bart.x >= 0x30bc && inventory.bartActionState === 0)
+        inventory.bartActionState = 6;
       return { continueGenericBartUpdate: true };
     }
 
@@ -70,13 +99,18 @@ export class Level1PlayerHandlers {
     // 38ECh calls the shared UpdateBartJumpState before tail-jumping to 5143h,
     // except while grounded FIRE is held. In that case 5143h reuses up/down
     // for the skateboard's 72h..80h vertical lane adjustment.
-    if (bart.airborne || !event.input.action) this.services.stepBartJumpState(event.input);
+    if (bart.airborne || !event.input.action)
+      this.services.stepBartJumpState(event.input);
 
     this.stepSkateboardPhysics(event.input);
     this.services.resolveBartStaticTerrain(event.previousBart, event.input);
     this.stepSkateboardAnimation(event.input);
     this.services.refreshBartSprite();
-    return { continueGenericBartUpdate: false, bartActionMode: "suppress-weapons", suppressInventorySelection: true };
+    return {
+      continueGenericBartUpdate: false,
+      bartActionMode: "suppress-weapons",
+      suppressInventorySelection: true,
+    };
   }
 
   private enterSkateboardMode(): void {
@@ -88,8 +122,16 @@ export class Level1PlayerHandlers {
 
     // 390Dh..3967h disables both type-61 boundary source records and clears
     // their resident runtime objects if currently loaded.
-    this.services.activateSourceRecord(LEVEL1_SKATEBOARD_BOUNDARY_LEFT_SOURCE_OFFSET, 0, "set");
-    this.services.activateSourceRecord(LEVEL1_SKATEBOARD_BOUNDARY_RIGHT_SOURCE_OFFSET, 0, "set");
+    this.services.activateSourceRecord(
+      LEVEL1_SKATEBOARD_BOUNDARY_LEFT_SOURCE_OFFSET,
+      0,
+      "set",
+    );
+    this.services.activateSourceRecord(
+      LEVEL1_SKATEBOARD_BOUNDARY_RIGHT_SOURCE_OFFSET,
+      0,
+      "set",
+    );
   }
 
   private leaveSkateboardMode(): void {
@@ -101,8 +143,16 @@ export class Level1PlayerHandlers {
 
     // 397Dh..39A4h restores 8000h on both boundary source records and resets
     // DS:0860 (Bart base-Y clamp) to 7Ah.
-    this.services.activateSourceRecord(LEVEL1_SKATEBOARD_BOUNDARY_LEFT_SOURCE_OFFSET, 0x8000, "set");
-    this.services.activateSourceRecord(LEVEL1_SKATEBOARD_BOUNDARY_RIGHT_SOURCE_OFFSET, 0x8000, "set");
+    this.services.activateSourceRecord(
+      LEVEL1_SKATEBOARD_BOUNDARY_LEFT_SOURCE_OFFSET,
+      0x8000,
+      "set",
+    );
+    this.services.activateSourceRecord(
+      LEVEL1_SKATEBOARD_BOUNDARY_RIGHT_SOURCE_OFFSET,
+      0x8000,
+      "set",
+    );
     this.services.bart.groundY = 0x007a;
   }
 
@@ -195,7 +245,8 @@ export class Level1PlayerHandlers {
         if (bart.facing === 1) bart.x = Math.max(0, bart.x + deltaX);
         else this.armDirectionLatches();
       } else if (deltaX > 0) {
-        if (bart.facing === 0) bart.x = Math.min(bart.maxX, 0x30ad, bart.x + deltaX);
+        if (bart.facing === 0)
+          bart.x = Math.min(bart.maxX, 0x30ad, bart.x + deltaX);
         else this.armDirectionLatches();
       }
     }
@@ -221,7 +272,10 @@ export class Level1PlayerHandlers {
     const bart = this.services.bart;
     // 53E8h: spray-can inventory byte DS:0775 switches the complete skateboard
     // descriptor family from 40h to 5Ah; this is availability, not FIRE state.
-    const base = (this.services.collisionState.inventoryCounts[3] ?? 0) !== 0 ? 0x5a : 0x40;
+    const base =
+      (this.services.collisionState.inventoryCounts[3] ?? 0) !== 0
+        ? 0x5a
+        : 0x40;
 
     if (bart.airborne) {
       const verticalFrame = s16(bart.velocityY) < 0 ? 0x0b : 0x0c;
@@ -239,15 +293,25 @@ export class Level1PlayerHandlers {
           return; // 5436h clears 0850h and preserves the prior descriptor this tick.
         }
         if (this.skateboardAnimState === 6) {
-          bart.velocityX = Math.max(-0x0800, Math.min(0x0800, s16(bart.velocityX) + this.skateboardImpulse));
+          bart.velocityX = Math.max(
+            -0x0800,
+            Math.min(0x0800, s16(bart.velocityX) + this.skateboardImpulse),
+          );
         }
       }
-      bart.spriteDescriptorId = base + this.skateboardAnimState + bart.facing * 0x0d;
+      bart.spriteDescriptorId =
+        base + this.skateboardAnimState + bart.facing * 0x0d;
       return;
     }
 
     let frame = this.brakeVisual ? 0x0a : 0x08;
-    const gameplayInput = !!(input.left || input.right || input.jump || input.down || input.action);
+    const gameplayInput = !!(
+      input.left ||
+      input.right ||
+      input.jump ||
+      input.down ||
+      input.action
+    );
     if (!this.brakeVisual && !gameplayInput) {
       bart.idleAnimCounter = (bart.idleAnimCounter + 2) & 0xff;
       if (bart.idleAnimCounter >= 0xf0) frame = 0x09;

@@ -23,6 +23,8 @@
       <button id="play-button" type="button">Play</button>
       <button id="step-button" type="button" title="One original logical object tick">Step tick</button>
       <button id="reset-button" type="button">Reset</button>
+      <label>Driver <select id="sound-driver"><option value="adlib">AdLib</option><option value="buzzer">PC speaker</option></select></label>
+      <button id="sound-button" type="button" aria-pressed="false" title="Original DOS audio: AdLib music/effects or PC speaker">Sound: off</button>
       <button id="select-bart-button" type="button" title="Selecteer Bart in de inspector">Bart</button>
       <label>Viewer tick rate
         <select id="tick-rate-select">
@@ -81,24 +83,35 @@
           <div id="hud-state" class="hud-state">READY</div>
           <div id="hud-event" class="hud-event" aria-live="polite"></div>
         </div>
-        <canvas id="world-canvas" aria-label="Level runtime world"></canvas>
+        <canvas tabindex="0" id="world-canvas" aria-label="Level runtime world"></canvas>
       </div>
-      <div class="help">O/P (of ←/→) = lopen · Q/↑ = springen/omhoog · A/↓ = omlaag · Space = FIRE · A+Space = inventory kiezen, laat A los = gebruik · Q+Space = run/high-jump · F8 = play/pause · . = one tick · drag/wheel = camera · Ctrl+wheel = zoom</div>
+      <div class="help">O/P (of ←/→) = lopen · Q/↑ = springen/omhoog · A/↓ = omlaag · Space = FIRE · A+Space = inventory kiezen, laat A los = gebruik · hold Q through landing = run · F8 = play/pause · . = one tick · drag/wheel = camera · Ctrl+wheel = zoom</div>
     </section>
 
-    <aside class="inspector">
-      <h2>Runtime inspector</h2>
-      <div id="inspector-content"><p>Klik op Bart, een runtime sprite of source-marker.</p></div>
-      <hr>
-      <h2>Milestone policy</h2>
-      <p>Sprites komen nu uit de <strong>echte scriptstate</strong>: <code>animBase + animFrame*12</code>. De statische <code>InitialFrameResolver</code> is niet meer de runtimebron.</p>
-      <p><code>SetAnimation</code>, <code>SetStaticFrame</code>, <code>Wait</code>, <code>Goto</code> en de eerste motion-opcodes worden uitgevoerd.</p>
-      <p>Bart gebruikt de aparte Bart-descriptortabel en de gereconstrueerde walk/jump/idle state. <strong>Terrain/object collisions, damage, invulnerability/blink, de DOS-HUD en inventory zijn actief.</strong> De HUD toont de gereconstrueerde gemeenschappelijke DOS-state: health, lives, score, timer en goals.</p>
-      <p>Oranje betekent dat dit object een nog niet geïmplementeerde runtimekeuze heeft bereikt. De laatste animatie en motion blijven wel doorstappen zodat het probleem zichtbaar blijft.</p>
-      <p class="muted">De Hz-keuze is alleen wall-clock pacing voor de viewer; de logische tickvolgorde is de gereconstrueerde DOS-volgorde.</p>
-    </aside>
+    <section class="debug-workbench" aria-label="Debug workbench">
+      <aside class="cheats-panel">
+        <h2>Level 1 shortcuts</h2>
+        <p class="muted">Fresh-scene shortcuts reset Level 1. Other actions keep your progress. These are viewer test tools.</p>
+        <div id="debug-presets"></div>
+      </aside>
+      <aside class="slots-panel">
+        <h2>Live object slots <small id="slot-count"></small></h2>
+        <p class="muted">Slot · type · source · frame · state · position. Select a slot to follow its current occupant.</p>
+        <div id="object-slots" role="group" aria-label="Object slots"></div>
+        <p id="reserved-slot" class="muted"></p>
+      </aside>
+      <aside class="inspector">
+        <h2>Runtime inspector</h2>
+        <figure class="frame-preview">
+          <canvas id="object-preview" width="360" height="176" aria-label="Selected object's current animation frame"></canvas>
+          <figcaption id="object-preview-caption">Select an object.</figcaption>
+        </figure>
+        <div id="inspector-content"><p>Select Bart, a sprite or a slot.</p></div>
+      </aside>
+    </section>
   </main>
 
+  <script src="/js/vendor/opl3.js"></script>
   <script type="module" src="/js/main.js"></script>
 </body>
 </html>

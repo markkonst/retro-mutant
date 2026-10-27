@@ -1,6 +1,7 @@
 import { RuntimeWorld } from "./RuntimeWorld.js";
 import { DosHudRenderer } from "./DosHudRenderer.js";
 import { glyphRows } from "./DosFont.js";
+import { applyXrayPalette, createXrayPalette } from "./XrayPalette.js";
 import { BartRuntime, GameObjectRuntime, LoadedLevel } from "./types.js";
 
 export interface ViewerOptions {
@@ -29,6 +30,7 @@ interface ScreenRect {
 }
 
 export class WorldViewer {
+  private xrayPalette = new Map<number, number[]>();
   private readonly backgroundRemapCache = new Map<string, HTMLCanvasElement>();
   private readonly ctx: CanvasRenderingContext2D;
   private readonly dosHud = new DosHudRenderer();
@@ -80,6 +82,7 @@ export class WorldViewer {
     this.selectedSourceIndex = null;
     this.selectedBart = false;
     this.backgroundRemapCache.clear();
+    this.xrayPalette = createXrayPalette(level.manifest.runtime);
     // Initialize like the recovered gameplay setup: startX - 0x88, clamped.
     this.cameraX = world.bart.x - 0x88;
     this.clampCamera();
@@ -224,9 +227,21 @@ export class WorldViewer {
     // Bart is a separate player/render object in the original engine.
     this.drawBart(world.bart, zoom);
     this.drawInventoryTransients(world, zoom);
+    this.drawStatueMessage(world, zoom);
     ctx.restore();
 
     this.dosHud.draw(ctx, world, level, zoom);
+    // A VGA palette change affects the entire display, including sprites/HUD.
+    // Remap only the game rectangle, after composing all original-colour art.
+    if (world.collisionState.inventory.alternateGraphicsTimer !== 0 && this.xrayPalette.size) {
+      const width = Math.min(this.canvas.width, Math.round(320 * zoom * dpr));
+      const height = Math.min(this.canvas.height, Math.round(200 * zoom * dpr));
+      if (width > 0 && height > 0) {
+        const frame = ctx.getImageData(0, 0, width, height);
+        applyXrayPalette(frame.data, this.xrayPalette);
+        ctx.putImageData(frame, 0, 0);
+      }
+    }
     if (this.options.showLabels) this.drawViewportInfo(level, world);
   }
 
@@ -480,6 +495,22 @@ export class WorldViewer {
       for (let row = 0; row < lines.length; row++) this.drawDosText(lines[row]!, px + 4, py + 3 + row * 8, zoom);
       this.ctx.restore();
     }
+  }
+
+  private drawStatueMessage(world: RuntimeWorld, zoom: number): void {
+    const event = world.globalEvent;
+    // Type 29 sets the original global message without spawning a speech
+    // object. Use its FAh lifetime; the box layout is a readable reconstruction
+    // until the common-overlay typewriter/blitter is ported.
+    if (world.level.level !== 1 || !event || event.segment !== 0x096d || event.offset !== 0x170b) return;
+    if (world.tickCount - event.changedAtTick >= ((event.words[0] ?? 0) >>> 8)) return;
+    const lines = event.lines.slice(0, 3);
+    if (!lines.length) return;
+    this.ctx.save();
+    this.ctx.fillStyle = "#ffffff";
+    this.ctx.fillRect(4 * zoom, 4 * zoom, 312 * zoom, (lines.length * 8 + 8) * zoom);
+    for (let row = 0; row < lines.length; row++) this.drawDosText(lines[row]!, 8, 8 + row * 8, zoom);
+    this.ctx.restore();
   }
 
   private drawDosText(text: string, x: number, y: number, zoom: number): void {

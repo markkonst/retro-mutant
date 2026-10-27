@@ -1,5 +1,7 @@
 # Level-specific handler architecture
 
+[Level chapters](levels/README.md) · [Runtime guide](runtime/README.md)
+
 This worktree keeps DOS engine mechanics generic and loads one typed level-specific handler set at a time.
 The goal is that Visual Studio **Find All References** leads from an engine event point to the level implementation without string-based event names or scattered `if (level === N)` blocks.
 
@@ -94,7 +96,7 @@ State `08` uses A/down to exit, O/P to select and Space to purchase. Coins and i
 
 ## Recovered Level-1-only DOS code not yet modeled
 
-- The Bart X `>=30BCh` Level-1 branch that seeds Bart action state 6.
+- The arena entry branch at `3A06h` is now implemented; see the boss section below.
 - Exact common-overlay transient raster/blitter semantics for the storefront `30xx` graphics.
 - The alternate `DS:1598` skateboard camera/movement branch remains incomplete.
 
@@ -146,3 +148,25 @@ These are intentionally listed rather than silently pretending Levels 2-5 have a
 3. Add the Level-2 factory case in `LevelHandlerRegistry.load()`.
 4. Move only proven Level-2-specific behavior from common code to typed event handlers.
 5. Add lifecycle + behavior regression tests before removing the old common branch.
+
+## Nelson arena reconstruction
+
+`3A06h..3A19h` sets action state 6 when Bart reaches X `30BCh` and no other
+item action is pending. State 6 uses the shared reserved projectile slot:
+FIRE while facing right starts the script at `096D:2FEC`, represented by
+frame 31, velocity `0800h` (8 pixels/tick), a 39-delay wait and despawn.
+The signed delay convention gives 40 update intervals before despawn.
+`8006h` waits for that slot to become free, then restores state 6.
+
+The exporter now reads config `+28h/+2Ah` into live/respawn boss HP and
+`+2Ch..32h` into the boss-relative rectangle. Level 1 starts with 10 HP.
+Handler 18 (`69ADh`) tests an 8x8 type-6 projectile and subtracts one HP.
+Handler 14 (`667Ah`) tests the helper against the registered boss rectangle,
+subtracts three with a signed zero/negative check, and removes the helper.
+Both feed the existing defeat latch read by Nelson's native callback.
+
+`smoke-level1-boss.mjs` starts inside the arena, uses the real streamed Nelson
+script and FIRE, and reaches the level-finished native without setting the
+defeat/completion flags. It enables viewer invulnerability to isolate the
+fight. It does not verify a full street-to-arena playthrough, player difficulty,
+the collection route or the original completion presentation.

@@ -1,8 +1,34 @@
 # Recovered DOS function catalogue
 
-Catalogue of the functions and code entrypoints identified so far for **The Simpsons: Bart vs. the Space Mutants (DOS)**. Consolidated from the local Ghidra V10/V11 material and the supplied research chat through viewer v0.9.6. Descriptions preserve the Ghidra source wording, with explicitly marked chat refinements.
+Catalogue of the functions and code entrypoints identified so far for **The Simpsons: Bart vs. the Space Mutants (DOS)**. Consolidated from the local Ghidra V10/V11 material and the supplied research chat through viewer v0.9.6. Descriptions retain the historical evidence and incorporate scoped corrections from the current implementation audit.
 
 A recovered DOS function is not necessarily fully implemented in the browser. This document records original behavior and research confidence; see [the collision matrix](COLLISION_HANDLER_MATRIX.md) and [level-handler documentation](LEVEL_HANDLERS.md) for implementation coverage.
+
+## Reading this catalogue
+
+[Documentation home](README.md) · [Function census](DOS_FUNCTION_CENSUS.md) · [Level guides](levels/README.md)
+
+Each function row records its original address, descriptive name, behavior, research confidence and evidence source. Names are explanatory labels, not recovered original source identifiers. Functions are grouped by subsystem, then by overlay. Internal state-machine labels and quarantined detections are deliberately separate.
+
+| Grade | How to interpret it |
+| --- | --- |
+| HIGH | The recorded role/branch is strongly identified in the cited research; not a claim that every caller or edge case is audited |
+| MEDIUM-HIGH | Strong overall interpretation with some context or path details still uncertain |
+| MEDIUM | Main behavior identified, but important state/context/side effects may need confirmation |
+| LOW | Tentative interpretation; preserve uncertainty before implementing dependent behavior |
+| Not graded | The source supplied no grade; do not infer either high or low confidence |
+
+Grades inherited from V10/V11 are retained unless a new scoped audit justifies changing them. A TypeScript regression does not automatically raise a whole function's grade. For implementation status use the collision matrix and level chapters; for additional candidate addresses use the census JSON.
+
+### Current corrections (2026-10-27)
+
+| Original location | Verified interpretation / current implementation | Scope of certainty |
+| --- | --- | --- |
+| 0000:7473 and 0000:588A | X-ray starts at FAh and counts down for 250 gameplay updates; FAh is not an unlimited sentinel | Direct instruction evidence for this timer branch; other timer branches retain their inherited grade |
+| 0000:2B32 within RunLevelGameplayLoop | Nonzero 07DE selects the next 64-byte graphics bank; the browser now uses manifest palette B | Direct branch/data evidence; no claim of full display-driver emulation |
+| 0000:6817 | Token collection advances helper index 07AF/07B1 and enables the configured helper source; it does not decrement purple goals | Direct branch evidence plus six-token Level-1 regression; original letter presentation is still reconstructed |
+| 096D:3165 | Timer 400/200 selects the passer-by branch | Both timed spray chains tested; no evidence here for a cinema interior |
+| 096D:218C (script data) | Bird departure, AHEAD message and persistent source removal after rocket hit | Script/interaction tested; this is not an additional executable function or proof of a head-jumping reward |
 
 ## Address conventions
 
@@ -20,6 +46,7 @@ A recovered DOS function is not necessarily fully implemented in the browser. Th
 | CSV11 | `simpsons_ghidra_starter_v11/all_functions.csv`, `v6/v7/v8/v9_new_functions.csv`, recovered-code CSVs and `all_labels.csv` | Additional entries, confidence and internal labels. |
 | FIX10 | `v10_function_corrections.csv` | Corrects the false standalone boundary at 68E8. |
 | OV11 | `ApplyDisplayOverlayV11.java`, `ApplySoundOverlayV11.java`, `ApplyLevelResourceOverlayV11.java`, `ApplyPresentationResourceOverlayV11.java`; display/sound layout CSVs | Overlay code entrypoints and APIs. Display API targets are read from the local unpacked pointer tables. |
+| RE26 | Current source-level audit, original listing branches and named regression programs (2026-10-27) | Scoped X-ray, helper-token and story corrections; no wholesale regrading. |
 | CHAT | Supplied old research chat, spanning v0.9.2–v0.9.6 and the 45-scene Level-1 catalogue | Later gameplay interpretations and corrections, explicitly marked in descriptions. |
 
 The Ghidra bundles remain local under `sandbox/TOOLS/Ghidra scripts`; this document includes semantic descriptions, not binary assets or copies of the game listing. The old `KNOWN_FUNCTIONS.md` still says v3/183 entries, so it is not used as the completeness authority. V10 corrections take precedence, including removal of 68E8 as a standalone function.
@@ -99,7 +126,7 @@ The Ghidra bundles remain local under `sandbox/TOOLS/Ghidra scripts`; this docum
 | `0000:66CE` | `0x66CE` | `Collision_GroundedOnlyTransition` | Only while g_BartAirborne == 0: body AABB then ApplyObjectCollisionTransition. | HIGH | MAP10 |
 | `0000:66DC` | `0x66DC` | `Collision_DescendingAirborneTransition` | Requires Bart airborne and velocityY >= 0 (descending/not rising): body AABB then transition. | HIGH | MAP10 |
 | `0000:66F1` | `0x66F1` | `Collision_TopContactBounceBreakOrDamage` | Custom top-contact path. Requires descending Bart and profile overlap. Depending object flags, can reflect Bart X/Y velocity, decrement a low-byte hit counter, award repeated 100-point chunks, transition the object, clear alternate flag 0x0400 and trigger event 5, or fall back to normal Bart damage when not safely bounced/broken. | HIGH | MAP10 |
-| `0000:6817` | `0x6817` | `Collision_CollectObjectiveAndAdvanceSequence` | Body AABB objective pickup. Removes object, awards 100 score, triggers event 8, then advances the recovered objective/sequence indices and platform callback data; can mark a linked script/source record 0x8000 at a sequence boundary. | MEDIUM | MAP10 |
+| `0000:6817` | `0x6817` | `Collision_CollectObjectiveAndAdvanceSequence` | Body AABB helper-token pickup. Removes object, awards 100 score and sound 8, advances letter index 07AF up to 07B1, and enables the configured helper source (08DE/08E0) on the last letter. Level 1 requires six tokens for Maggie; this does not alter purple goals or progress 0766. | MEDIUM | MAP10 |
 | `0000:6895` | `0x6895` | `Collision_ResolveHorizontalSolidCollision` | Body AABB horizontal solid. Suppressed by certain action/skateboard state. Resolves Bart to x=obj.x-0x10 when approaching from left or to obj.x+profile.xOffset+profile.width-2 when from right, and zeros horizontal velocity/related movement state. | HIGH | MAP10 |
 | `0000:68DE` | `0x68DE` | `Collision_BartActionHitObject` | Only runs when g_BartActionActive != 0. Builds the facing-dependent Bart action/weapon hitbox from g_BartActionHitboxObject and tests it against the target profile. Can transition or destroy target depending parameter/state. There is intentionally no normal Bart-body fallback. Chat: handler 15 uses the separate Bart action/spray hitbox and low five object-flag bits as the remaining hit count, then applies the profile transition. | HIGH | MAP10+CHAT |
 | `0000:697D` | `0x697D` | `Collision_SpecialObjectType2RegionTransition` | Checks reserved action object type 2 and a narrow region/state condition before applying the target object's collision transition. Secondary/action-object dependent. | MEDIUM | MAP10 |
@@ -153,7 +180,7 @@ The Ghidra bundles remain local under `sandbox/TOOLS/Ghidra scripts`; this docum
 | --- | --- | --- | --- | --- | --- |
 | `0000:29B0` | `0x29B0` | `RunLevelGameplayLoop` | Top-level level runner and normal frame loop. Initializes global level state (lives=3, timer=999 BCD, inventory defaults), loads the selected level, then per frame executes in this recovered order: PollGameplayInput -> render-list swap -> UpdateGoalAndGateState -> UpdateBart -> UpdateBartActionAndWeaponState -> StreamAndUpdateLevelObjects -> BuildBartRenderObject -> UpdateGameplayTimers -> UpdateCameraHorizontal -> render services -> UpdateTerrainAndObjectWindowPointers -> ProcessBartObjectCollisions. Hit/death and level-complete states divert out of the normal loop. | HIGH | MAP10 |
 | `0000:2BAF` | `0x2BAF` | `GameplayLoop_WaitForInputAndResume` | Alternate/resume gameplay entry. Waits for nonzero gameplay input, then executes the same Bart/object/render/window/collision ordering as the normal frame loop. | HIGH | MAP10 |
-| `0000:588A` | `0x588A` | `UpdateGameplayTimers` | Updates transient gameplay timers, HUD popup/message timing and inventory/action timing, and calls HUD status refresh where required. | MEDIUM | MAP10 |
+| `0000:588A` | `0x588A` | `UpdateGameplayTimers` | Updates transient gameplay timers, HUD popup/message timing and inventory/action timing, and calls HUD status refresh where required. RE26: 588A..589C decrements nonzero DS:07DE every update, including initial FAh, and sets graphics refresh byte DS:0002 when it expires. | MEDIUM | MAP10 |
 | `0000:6EB3` | `0x6EB3` | `UpdateGoalAndGateState` | Per-frame global timer/goal gate update. Timer zero forces g_BartHitDeathTimer=0x32 and enters the hit/death path. Otherwise g_LevelTimerTickDivider decrements and reloads to 0x23; on reload it BCD-decrements the swapped timer. When goalsRemainingBCD reaches zero, sets the one-shot goal-completion state, displays the level message (except level 5) and activates/changes the configured gate/source progression. Chat v0.9.6: zero goals remove Level-1 barricade source #123 and any resident object, allowing Nelson source #125 to stream. This is separate from the later boss arena lock. | HIGH | MAP10+CHAT |
 
 ### hud
@@ -226,7 +253,7 @@ The Ghidra bundles remain local under `sandbox/TOOLS/Ghidra scripts`; this docum
 | `096D:313C` | `0xC80C` | `Level1Native_RegisterCurrentObjectAsBoss` | FAR callback at 096D:313C. Stores the current ES:BX GameObject as the registered boss/linked-target FAR pointer in DS:079D/079F. Several secondary-hitbox collision handlers later resolve this target. | HIGH | MAP10 |
 | `096D:3147` | `0xC817` | `Level1Native_NelsonChooseAttackOrDeath` | FAR callback at 096D:3147. If the recovered boss-defeated/event byte is set, replaces SI with death script 0x23A8. Otherwise advances the Level-1 RNG and, for one random branch, skips four inline script bytes. This callback is both state- and control-flow-changing. | HIGH | MAP10 |
 | `096D:315F` | `0xC82F` | `Level1Native_ToggleLevelFinishedFlag` | FAR callback at 096D:315F. Bitwise-NOTs DS:0783 (the byte otherwise used as g_LevelFinished in the main gameplay loop). Mechanical effect is certain; call-site intent is a Level-1 special-sequence completion toggle. | MEDIUM | MAP10 |
-| `096D:3165` | `0xC835` | `Level1Native_BranchAtTimer400Or200` | FAR callback at 096D:3165. Tests the swapped packed-BCD level timer for words 0x0004 or 0x0002 (400/200-second milestones in this storage order). On either milestone advances SI by four bytes, selecting the alternate inline script branch. Chat: T90 uses this timer branch to spawn T91 at 4:00/2:00. It is a passer-by controller, not Nelson and not proof of a cinema bonus screen. | HIGH | MAP10+CHAT |
+| `096D:3165` | `0xC835` | `Level1Native_BranchAtTimer400Or200` | FAR callback at 096D:3165. Tests the swapped packed-BCD level timer for words 0x0004 or 0x0002 (400/200-second milestones in this storage order). On either milestone advances SI by four bytes, selecting the alternate inline script branch. Chat/RE26: T90 uses this timer branch to spawn T91 at displayed timer values 400/200. It is a passer-by controller, not Nelson and not proof of a cinema bonus screen. | HIGH | MAP10+CHAT |
 | `096D:3179` | `0xC849` | `Level1Native_BranchIfType67AtRecord0599` | FAR callback at 096D:3179. Reads the mutable Level-1 record at DS:0599+6; if its typeOffset is 0x0086 (type 67), advances SI by four bytes. This is a script branch keyed by persistent level-object state. | MEDIUM | MAP10 |
 | `096D:3187` | `0xC857` | `Level1Native_SelectRandomScriptFromTable` | FAR callback at 096D:3187. Advances Level1_RandomStep, masks the result with 7, and replaces/returns SI from one of eight u16 script offsets in the table at 096D:16FB. This is an explicit random script-control transfer. | HIGH | MAP10 |
 | `096D:3198` | `0xC868` | `Level1Native_SetRandomVelocityX` | FAR callback at 096D:3198. Advances Level1_RandomStep, masks with 7 and writes GameObject.velocityX from the eight-entry signed 8.8 velocity table at 096D:16EB. | HIGH | MAP10 |
@@ -441,7 +468,7 @@ These recovered jump targets are useful when following assembly, but are not ass
 | `0000:7416` | `InventoryUse_Item07_Level3Trigger` | Inventory item 7 (MAGNET) dispatches a Level-3 interaction trigger. | HIGH | CSV11+CHAT |
 | `0000:7436` | `InventoryUse_Item09_DecrementAndSpawn` | Inventory item 9 (DONUTS) decrements its inventory counter and spawns the corresponding transient item effect. | HIGH | CSV11+CHAT |
 | `0000:7467` | `InventoryUse_ResetSelection` | Shared exit/reset branch clears inventory selection state after item use. | HIGH | CSV11+CHAT |
-| `0000:7473` | `InventoryUse_Item01_ToggleAlternateGraphics` | Inventory item 1 (X-RAY SPECS) toggles alternate-graphics byte 07DE between 00 and FA; flag-0400 objects render with +48h descriptor offset. | HIGH | CSV11+CHAT |
+| `0000:7473` | `InventoryUse_Item01_ToggleAlternateGraphics` | Inventory item 1 (X-RAY SPECS) toggles alternate-graphics byte 07DE between 00 and FA and sets graphics refresh byte 0002. UpdateGameplayTimers counts down FAh over 250 updates. Nonzero state selects graphics palette bank B and flag-0400 objects render with +48h descriptor offset. RE26 corrects the former unlimited-duration interpretation. | HIGH | CSV11+CHAT |
 | `0000:7497` | `InventoryUse_Item04_StartActionState2` | Inventory item 4 (CHERRY BOMB) starts reserved action state 2. | HIGH | CSV11+CHAT |
 | `0000:74BA` | `InventoryUse_Item05_StartActionState4` | Inventory item 5 (ROCKET) starts reserved action state 4. | HIGH | CSV11+CHAT |
 | `0000:74E0` | `InventoryUse_Item12_LocationTeleport` | Inventory item 12 (KEY) checks location and requests Bart teleport/reposition with viewport/streaming rebuild. | HIGH | CSV11+CHAT |
@@ -456,48 +483,49 @@ The 43-entry table is at root `0000:5F67`. Index 0 means no collision and is not
 | Index | DOS address | Function | Mechanical behavior (reference CSV) |
 | --- | --- | --- | --- |
 | 0 | — | `NoCollision` | Geen collision-handler. |
-| 1 | `0000:6650` | `Collision_DamageBartOrTransitionObject` | Generieke AABB. Kan object transiteren/despawnen via collision-param; anders Bart damage + invulnerability. |
-| 2 | `0000:6618` | `Collision_CollectExtraLife` | AABB, effect/event, ++DS:076F, object en source-record verwijderen. |
-| 3 | `0000:66F1` | `Collision_TopContactBounceBreakOrDamage` | Custom top-contact test terwijl Bart daalt. Kan Bart X/Y-velocity omkeren, object hit-count verminderen/transiteren, of Bart beschadigen. |
-| 4 | `0000:6BFD` | `Collision_CollectInventoryResource` | AABB; collision-param is pointer naar inventaris/resource-byte (o.a. 0774/0775). Increment, UI selectie/timer, object verwijderen. |
-| 5 | `0000:6CEC` | `Collision_ConsumeObjectAndTriggerEvent7` | AABB; effects, native/event 7, globale counter/state bijwerken, object/source verwijderen. |
-| 6 | `0000:6817` | `Collision_CollectObjectiveAndAdvanceSequence` | AABB; object verwijderen, effects + native/event 8, progress/sequence globals bijwerken. |
-| 7 | `0000:65DC` | `Collision_TransitionObjectAndLaunch` | AABB -> collision transition; daarna velocityX/Y instellen uit kleine tabel op basis van lage object-flagbits. |
-| 8 | `0000:65B5` | `Collision_AirborneOnlyTransition` | Alleen als Bart airborne is: AABB en ApplyObjectCollisionTransition. |
-| 9 | `0000:66CE` | `Collision_GroundedOnlyTransition` | Alleen als Bart niet airborne is: AABB en transition. |
-| 10 | `0000:6895` | `Collision_ResolveHorizontalSolidCollision` | AABB; duwt Bart horizontaal naar buiten, reset X velocity en walk animation wanneer hij richting object beweegt. |
-| 11 | `0000:6D38` | `Collision_OneWayLandingAndOptionalTransition` | Landingtest van boven; zet Bart op oppervlak, Vy=0/airborne=0. Object-count kan dalen en daarna transitie uitvoeren. |
-| 12 | `0000:6DC6` | `Collision_LandOnMovingPlatform` | One-way landing op object; Vy=0, airborne=0 en Bart X wordt meegenomen met object-delta. |
-| 13 | `0000:66DC` | `Collision_DescendingAirborneTransition` | Alleen airborne én niet meer stijgend: AABB en transition. |
-| 14 | `0000:667A` | `Collision_SecondaryHitboxBossDamage3` | Test een secundaire hitbox/object i.p.v. Bart; bij hit DS:0896 -= 3, current object verwijderd, statusflag kan gezet worden. |
-| 15 | `0000:68DE` | `Collision_BartActionHitObject` | Gebruikt dedicated action-object op 0EB7 en facing-afhankelijke hitbox. Verlaagt object hit-count of transition/despawn. |
-| 16 | `0000:697D` | `Collision_SpecialObjectType2RegionTransition` | Reageert op reserved action-object 0E87 wanneer typeOffset==2 en het binnen hardcoded regio ligt; voert transition uit. |
-| 17 | `0000:6A07` | `Collision_SpecialObjectType4HitTransition` | Test reserved action-object 0E87 met typeOffset==4 tegen object; bij overlap transition. |
-| 18 | `0000:69AD` | `Collision_BartProjectileHitsBoss` | Test reserved action-object typeOffset==6; bij overlap --DS:0896, action-object uitschakelen en globale status bijwerken. |
-| 19 | `0000:65C4` | `Collision_CollectInvulnerabilityPickup` | AABB; effect, zet Bart damage-immunity timer DS:083D op 0xFA en despawnt pickup. |
-| 20 | `0000:6E50` | `Collision_ExternalCountdownTransition` | Kijkt naar extern/source record; decrement byte zolang 0x8000-status actief is, transition wanneer teller nul wordt. |
-| 21 | `0000:6B87` | `Collision_LinkedObjectSpecialTransition` | Hardcoded positie/typevoorwaarden; zoekt gekoppeld runtime-object en forceert een specifieke objecttransitie. |
-| 22 | `0000:6E70` | `Collision_FeetOnlyDamageOrTransition` | Verplaatst Bart-top 20 px omlaag vóór AABB: alleen onderste/voetzone. Daarna dezelfde damage/transition-logica als 6650. |
-| 23 | `0000:6B47` | `Collision_LinkedObjectProximityTransition` | Zoekt ander runtime-object met opgegeven typeOffset en test nabijheid; current object verwijderen en linked object transiteren. |
-| 24 | `0000:6480` | `Collision_SpecialObjectType8HitElseHazard` | Reserved action-object typeOffset==8 kan object triggeren; anders valt routine terug op event/destroy-handler 6CEC. |
-| 25 | `0000:6A6D` | `Collision_SpecialObjectType10ClearIndexedFlag` | Reserved action-object typeOffset==0x0A/state 2; overlap wist indexed global flag. |
-| 26 | `0000:6AC7` | `Collision_SpecialObjectType12ClearFlagAndCount` | Reserved action-object typeOffset==0x0C/state 2; overlap wist object flag en kan globale teller 0813 verhogen. |
-| 27 | `0000:5FBD` | `Collision_SpecialObjectType14HitElseEvent` | Reserved action-object typeOffset==0x0E kan transition triggeren; anders afhankelijk van objectflag fallback naar 6CEC. |
-| 28 | `0000:6054` | `Collision_FallingLargeObjectHazardOrTopContact` | Speciale ruime contacttest voor object met positieve Vy; directe Bart damage of fallback naar top-contact handler 66F1. |
-| 29 | `0000:6086` | `Collision_DamageBartIfObjectField2CZero` | Alleen wanneer object +2C byte nul is: generieke damage/transition-handler 6650. |
-| 30 | `0000:617B` | `Collision_IncrementSpecialCounter780IfReady` | AABB; onder globale voorwaarden ++byte 0780 en zet busy/statusflag 0784. |
-| 31 | `0000:60D6` | `Collision_AirbornePatternMatchTransition` | Airborne AABB; vergelijkt lage objectflags met cyclische patroonstate 0768 en transition bij match. |
-| 32 | `0000:60AB` | `Collision_CollectSequenceTokenAndAdvance` | AABB; sound, DS:076A += 4, object/source verwijderen tot target 0x1C. |
-| 33 | `0000:6090` | `Collision_PlatformLandingAndToggle76C` | Roept moving-platform landing aan; wanneer DS:076A==0x1C togglet DS:076C. |
-| 34 | `0000:61DB` | `Collision_BounceBartUpward` | AABB; forceert airborne/jump-state en maakt Bart Vy telkens meer negatief tot ongeveer -5.0. |
-| 35 | `0000:62DD` | `Collision_SpecialObjectType16DestroyAndAdvance` | Reserved action-object typeOffset==0x10, stilstaand; overlap vernietigt current object en transformeert state 0817. |
-| 36 | `0000:6338` | `Collision_MovingPlatformLandingWithDisplacement` | Landingvariant; corrigeert Bart Y, Vy, airborne en schuift Bart X mee op basis van object previous/current X. |
-| 37 | `0000:63C6` | `Collision_MovingHazardDamageOrLandingTransition` | Bij bewegend object kan directe damage volgen; bij stil object + dalende Bart gebruikt contact om transition uit te voeren. |
-| 38 | `0000:6258` | `Collision_SpecialObjectType8HitElseDamage` | Reserved action-object typeOffset==8 kan current object transiteren; anders normale AABB en Bart damage. |
-| 39 | `0000:612E` | `Collision_SecondaryHitboxStopTargetVelocityX` | Test secondary object/hitbox via pointer 079D en bbox 089A; bij hit zet target +12 velocityX op nul. |
-| 40 | `0000:619F` | `Collision_ConsumeCounter780AndMarkProgress` | AABB; consumeert byte 0780, update 0766 en markeert opeenvolgende level records met 0x8000. |
-| 41 | `0000:61F8` | `Collision_SecondaryHitboxDamageAndLaunchObject` | Secondary hitbox; vermindert target byte, maakt current object non-collidable en geeft launch velocity/acceleration. |
-| 42 | `0000:6440` | `Collision_RisingObjectActivateLinkedRecords` | Wanneer current object stijgt en hoog genoeg is: one-shot flag 0823 en zet 0x8000-status op twee via profiel gekoppelde records. |
+| 1 | `0000:6650` | `Collision_DamageBartOrTransitionObject` | Body AABB. After the AABB helper DI points to parameter: even nonzero => object transition and RETURN with no damage; odd => clear object flags then enter damage path; zero => damage path. Damage only starts when invulnerabilityTimer==0, calling BeginBartHitInvulnerability and setting hitDeathTimer=0x32. |
+| 2 | `0000:6618` | `Collision_CollectExtraLife` | Body AABB pickup. AddScoreBCD(0x64) => 60 points, trigger event/sound 0x0D, increment g_LivesRemaining, clear runtime object and backing source active state. |
+| 3 | `0000:66F1` | `Collision_TopContactBounceBreakOrDamage` | Custom top-contact path. Requires descending Bart and profile overlap. Depending object flags, can reflect Bart X/Y velocity, decrement a low-byte hit counter, award repeated 100-point chunks, transition the object, clear alternate flag 0x0400 and trigger event 5, or fall back to normal Bart damage when not safely bounced/broken. |
+| 4 | `0000:6BFD` | `Collision_CollectInventoryResource` | Body AABB inventory pickup. Uses profile.parameter as a DS counter address, prevents the capped 0780 special counter from exceeding 4, triggers event 2, despawns/unlinks source, BCD-increments the addressed counter, dispatches item-specific pickup effect, refreshes item HUD and starts the pickup-popup timer. |
+| 5 | `0000:6CEC` | `Collision_ConsumeObjectAndTriggerEvent7` | Body AABB goal/object pickup. Awards 100 score via 0x90+0x10, triggers event 7, BCD-decrements goalsRemainingBCD when nonzero, then removes runtime object and source state. |
+| 6 | `0000:6817` | `Collision_CollectObjectiveAndAdvanceSequence` | Body AABB helper-token pickup. Removes object, awards 100 score and sound 8, advances letter index 07AF up to 07B1, and enables the configured helper source (08DE/08E0) on the last letter. Level 1 requires six tokens for Maggie; this does not alter purple goals or progress 0766. |
+| 7 | `0000:65DC` | `Collision_TransitionObjectAndLaunch` | Body AABB -> signed collision transition, then uses low object-flag nibble as byte offset into CollisionLaunchVelocityTable. Clears low flag nibble, applies signed 8.8 velocityX/Y pair, and sets runtimeFlags 0x80 when launched horizontally. |
+| 8 | `0000:65B5` | `Collision_AirborneOnlyTransition` | Only while g_BartAirborne != 0: body AABB then ApplyObjectCollisionTransition. |
+| 9 | `0000:66CE` | `Collision_GroundedOnlyTransition` | Only while g_BartAirborne == 0: body AABB then ApplyObjectCollisionTransition. |
+| 10 | `0000:6895` | `Collision_ResolveHorizontalSolidCollision` | Body AABB horizontal solid. Suppressed by certain action/skateboard state. Resolves Bart to x=obj.x-0x10 when approaching from left or to obj.x+profile.xOffset+profile.width-2 when from right, and zeros horizontal velocity/related movement state. |
+| 11 | `0000:6D38` | `Collision_OneWayLandingAndOptionalTransition` | One-way top landing. Rejects rising Bart; tests Bart x+6 against object horizontal profile span. Allows at most 2 px penetration from above, snaps Bart Y to object.y+profile.yOffset, writes platformContactY, clears Vy/airborne. On first airborne landing, decrements LOW BYTE of object.flags if nonzero; only when it reaches zero is profile.parameter transition applied. |
+| 12 | `0000:6DC6` | `Collision_LandOnMovingPlatform` | Moving one-way platform. Similar to handler 11 but allows only 1 px from above, ignores object flags bit0x80, always clears airborne/Vy, carries Bart horizontally by the signed integer delta derived from object velocityX+fractionX, then applies profile.parameter transition. |
+| 13 | `0000:66DC` | `Collision_DescendingAirborneTransition` | Requires Bart airborne and velocityY >= 0 (descending/not rising): body AABB then transition. |
+| 14 | `0000:667A` | `Collision_SecondaryHitboxBossDamage3` | Does NOT use Bart body AABB as the attacking shape. Builds a secondary/reserved hitbox from level/action state and, on overlap, subtracts 3 from boss HP via ApplyBossHelperHitDamage3; struck object is removed. Dependent on secondary action-object state. |
+| 15 | `0000:68DE` | `Collision_BartActionHitObject` | Only runs when g_BartActionActive != 0. Builds the facing-dependent Bart action/weapon hitbox from g_BartActionHitboxObject and tests it against the target profile. Can transition or destroy target depending parameter/state. There is intentionally no normal Bart-body fallback. Chat: handler 15 uses the separate Bart action/spray hitbox and low five object-flag bits as the remaining hit count, then applies the profile transition. |
+| 16 | `0000:697D` | `Collision_SpecialObjectType2RegionTransition` | Checks reserved action object type 2 and a narrow region/state condition before applying the target object's collision transition. Secondary/action-object dependent. |
+| 17 | `0000:6A07` | `Collision_SpecialObjectType4HitTransition` | Tests reserved action object type 4 against the target profile/region, then applies a transition and related action-state changes. Secondary/action-object dependent. |
+| 18 | `0000:69AD` | `Collision_BartProjectileHitsBoss` | When level event gate permits and reserved action object is the projectile type, tests projectile hitbox against target; ApplyBossProjectileHitDamage1 decrements boss HP by 1 and removes projectile/updates boss state. Chat: boss hit requires an active reserved projectile with typeOffset=6, an 8x8 projectile AABB, and a live boss. Decrements boss counter 0896, sets 0784=FF at zero and destroys the projectile. Full browser boss behavior remains unfinished. |
+| 19 | `0000:65C4` | `Collision_CollectInvulnerabilityPickup` | Body AABB pickup: awards 50 points, sets blinkPhase=0 and invulnerabilityTimer=0xFA (250), then detaches source and despawns. This is longer than normal post-hit invulnerability (0x64). |
+| 20 | `0000:6E50` | `Collision_ExternalCountdownTransition` | No normal body AABB. Reads configured external/source record; while its 0x8000 state is active decrements the low countdown byte and applies profile.parameter transition when the countdown reaches zero. Chat: WRENCH writes 803F to the configured source; C20 decrements its low byte and triggers T73->T74 at zero. Do not replace this with a body AABB. |
+| 21 | `0000:6B87` | `Collision_LinkedObjectSpecialTransition` | Linked-object special case using hardcoded position/type/state relationships, then applies a signed transition through ApplyCollisionTransitionFromBP. Keep tied to linked-object state; not a generic body collision. |
+| 22 | `0000:6E70` | `Collision_FeetOnlyDamageOrTransition` | Shifts Bart top down by 0x14 before the shared AABB/damage-transition path, effectively limiting the trigger to Bart's lower/feet zone. |
+| 23 | `0000:6B47` | `Collision_LinkedObjectProximityTransition` | Finds another active runtime object by typeOffset, tests proximity/relationship to current target and conditionally performs a collision transition. Depends on linked runtime objects, not only Bart AABB. |
+| 24 | `0000:6480` | `Collision_SpecialObjectType8HitElseHazard` | If reserved action object type 8 satisfies its hit conditions, processes target transition/consume behavior; otherwise falls through to hazard/event handling. Secondary/action-object dependent. |
+| 25 | `0000:6A6D` | `Collision_SpecialObjectType10ClearIndexedFlag` | Requires reserved action object type 0x0A and matching region/AABB; clears an indexed level flag through ClearIndexedLevelFlagOnCollision and updates action object state. |
+| 26 | `0000:6AC7` | `Collision_SpecialObjectType12ClearFlagAndCount` | Requires reserved action object type 0x0C; on hit clears/consumes a flagged objective and advances g_LevelCounter0813/state through ConsumeFlaggedObjectiveAndAdvanceState813. |
+| 27 | `0000:5FBD` | `Collision_SpecialObjectType14HitElseEvent` | Checks reserved action object type 0x0E and region/AABB. Matching hit applies target transition; otherwise, when current object low flag bit permits, routes to Collision_ConsumeObjectAndTriggerEvent7. Secondary/action-object dependent. |
+| 28 | `0000:6054` | `Collision_FallingLargeObjectHazardOrTopContact` | Special falling/large-object geometry. Certain top/side overlap while invulnerability is zero starts normal damage + hitDeathTimer=0x32; otherwise tail-routes into Collision_TopContactBounceBreakOrDamage for bounce/break semantics. |
+| 29 | `0000:6086` | `Collision_DamageBartIfObjectField2CZero` | Gate wrapper: only when low byte of GameObject.motionReferenceX (+2C) is zero does it tail-enter generic Collision_DamageBartOrTransitionObject. |
+| 30 | `0000:617B` | `Collision_IncrementSpecialCounter780IfReady` | Body AABB. Only when g_LevelEventGate0784==0, g_LevelProgress0766==0x0F and g_SpecialCounter0780!=4: increment counter0780 and set event gate 0784=0xFF. |
+| 31 | `0000:60D6` | `Collision_AirbornePatternMatchTransition` | Airborne-only body AABB. Compares low object flag nibble to AirborneCollisionPatternTable selected by g_LevelPatternState0768; on match advances pattern state by 2 with wrap at 0x12 and applies collision transition. |
+| 32 | `0000:60AB` | `Collision_CollectSequenceTokenAndAdvance` | Unless sequence progress 076A already equals 0x1C: body AABB, award 50 points, add 4 to g_LevelSequenceProgress076A, remove runtime object and clear source active state. |
+| 33 | `0000:6090` | `Collision_PlatformLandingAndToggle76C` | Clears g_LevelToggle076C, invokes moving-platform landing behavior, then bitwise-NOT toggles 076C when g_LevelSequenceProgress076A==0x1C. |
+| 34 | `0000:61DB` | `Collision_BounceBartUpward` | Body AABB: sets Bart airborne and jump-state byte 0836=0xFF. If velocityY is not already faster upward than -0x0500, subtracts 0x0100 from current velocityY. This is a velocity-step bounce, distinct from StaticTerrain's fixed -0x0580 spring. |
+| 35 | `0000:62DD` | `Collision_SpecialObjectType16DestroyAndAdvance` | Requires reserved action object type 0x10 with zero action velocities; on target hit destroys object and advances state 0817 through DestroyObjectAndAdvanceState817. Secondary/action-object dependent. |
+| 36 | `0000:6338` | `Collision_MovingPlatformLandingWithDisplacement` | Special moving-platform landing variant. Uses its own vertical tolerance/offset rules and motionReferenceX displacement bookkeeping, updates Bart/base/platform contact state and carries Bart with object movement before transition. |
+| 37 | `0000:63C6` | `Collision_MovingHazardDamageOrLandingTransition` | Moving-object hybrid: depending approach/state can land/transition like a platform or start normal Bart damage/invulnerability. Uses object movement/reference fields and handler-specific geometry. |
+| 38 | `0000:6258` | `Collision_SpecialObjectType8HitElseDamage` | Checks reserved action object type 8 against target; a valid secondary hit follows special target logic, otherwise body/hazard overlap can enter normal Bart damage. Secondary/action-object dependent. |
+| 39 | `0000:612E` | `Collision_SecondaryHitboxStopTargetVelocityX` | Uses the reserved/secondary hitbox rather than normal Bart body; on overlap resolves a linked target and zeros that target's horizontal velocity through StopLinkedTargetHorizontalVelocity. |
+| 40 | `0000:619F` | `Collision_ConsumeCounter780AndMarkProgress` | Body AABB, then if g_SpecialCounter0780>0: decrement it, BCD-decrement goalsRemainingBCD, increment levelProgress0766 and mark the corresponding 10-byte progress-source record's flags 0x8000. |
+| 41 | `0000:61F8` | `Collision_SecondaryHitboxDamageAndLaunchObject` | Secondary hitbox collision. DamageLinkedTargetAndLaunchObject mutates linked/boss target state and launches/changes the current object. Depends on reserved action/secondary object state. |
+| 42 | `0000:6440` | `Collision_RisingObjectActivateLinkedRecords` | Conditional rising-object/linked-record handler. When vertical/motion/state gates match, activates or marks linked source records and advances the associated sequence. Not a generic body AABB handler. |
+
 
 ## Display overlays: VGA, EGA, CGA and TGA
 
@@ -791,12 +819,12 @@ Internal label `ROLAND:03F9` — `Roland_ResetMpu401AndReadAck`: sends reset FFh
 | --- | --- | --- | --- |
 | `BUZZER:0000` | `BUZZER_ServiceEntry` | Public FAR service entry, periodically called by display IRQ0. | HIGH / OV11 |
 | `BUZZER:0004` | `BUZZER_InitializeProbeEntry` | Public FAR initialization/probe entry; AL nonzero means accepted. | HIGH / OV11 |
-| `BUZZER:0041` | `BUZZER_ServiceTickInternal` | Consumes music/SFX commands and advances voices/event sequences. | HIGH / OV11 |
+| `BUZZER:0041` | `BUZZER_ServiceTickInternal` | Services the pending PC-speaker effect and tone sequence; this backend does not implement the AdLib music sequencer. | HIGH / OV11 |
 | `BUZZER:005C` | `BUZZER_ProcessPendingSoundEffect` | Consumes mailbox +000A, maps ID through the 19-entry SFX table and starts an effect voice/sequence. | HIGH / OV11 |
 | `BUZZER:0087` | `Buzzer_SpeakerOff` | Clears speaker gate bits 0/1 at port 61h. | HIGH / OV11 |
 | `BUZZER:008E` | `BUZZER_InitializeAndProbeHardware` | Initializes PIT channel 2 and PC-speaker fallback. | HIGH / OV11 |
 | `BUZZER:009D` | `Buzzer_StartSoundEffect` | Maps SFX ID through table 0234h and initializes sequence. | HIGH / OV11 |
-| `BUZZER:00C0` | `Buzzer_AdvanceSoundSequence` | Advances three-byte duration/pitch-index/delta records and programs PIT channel 2 at 43h/42h. | HIGH / OV11 |
+| `BUZZER:00C0` | `Buzzer_AdvanceSoundSequence` | Advances three-byte duration/signed-delta/pitch-index records and programs PIT channel 2 at 43h/42h. A record-load tick retains the previous pitch; subsequent ticks output the divisor, apply signed delta with 16-bit wrap and decrement duration. | HIGH / OV11 |
 
 ## Resident graphics/resource overlay entrypoints
 
@@ -850,12 +878,15 @@ Do not implement these as gameplay routines. They are documented because they oc
 
 ## Research limits and chat corrections
 
-- The 45-scene catalogue mixes confirmed DOS mechanisms with comparisons to other ports. Cinema bonus-show behavior, the complete Jebediah-head secret, and exact Maggie activation remain unresolved; no speculative function address is invented for them.
+- The 45-scene catalogue mixes confirmed DOS mechanisms with comparisons to other ports. Cinema bonus-show behavior and a separate Jebediah-head reward remain unresolved. Maggie activation is now traced through 07AF/07B1 and the +70h helper-source pointer; see [the story audit](LEVEL1_STORY_RESEARCH.md).
 - The special render command behind the red poster/awning, common-overlay inventory/shop blitters, full boss/projectile behavior, checkpoint exactness and some alternate player/camera routes remain only partly modeled in the browser.
 - The chat's early claim that Space is required for running was superseded by the Q-held landing mechanism in v0.9.5. Flag 1000 alone is not the red-paint indicator. Cheats grant unlimited lives, not invulnerability. These corrections are reflected above.
 - FAR API slots such as root CS:7D91/7D95 are pointer storage, not root functions: V11 names them QueueMusicCommand/QueueSoundEffect. The executable targets are in the selected display overlay and are listed there.
 
 ## Catalogue coverage
+
+A subsequent [static census](DOS_FUNCTION_CENSUS.md) found **234 additional callable-address candidates** outside this catalogue. The resulting 723-entry inventory is not a certified total; see its counting rules and unresolved control flow.
+
 
 - Root EXE / embedded Level-1 natives: **214** unique function entrypoints.
 - Root internal code labels: **55** (not counted as independent functions).

@@ -93,3 +93,37 @@ code { font-family: Consolas, monospace; color: #f0ca78; }
 .debug-badge { display: inline-block; padding: .12rem .35rem; border: 1px solid #f3e300; color: #f3e300; font-family: Consolas, monospace; font-weight: 700; }
 .hidden { display: none !important; }
 .cheat-state { color: #c9c9c9; font-family: Consolas, monospace; font-size: .82rem; }
+
+
+/* The game stays full-width; the three research panels follow left-to-right. */
+body { overflow: auto; }
+.layout { flex: none; display: flex; flex-direction: column; }
+.viewer-panel { flex: none; }
+.canvas-wrap { flex: none; max-height: none; justify-content: flex-start; }
+.debug-workbench { display: grid; grid-template-columns: minmax(210px, .65fr) minmax(310px, 1fr) minmax(380px, 1.4fr); align-items: start; border-top: 1px solid #3a3a3a; }
+.cheats-panel, .slots-panel, .debug-workbench .inspector { min-width: 0; padding: 1rem; max-height: 80vh; overflow: auto; }
+.debug-workbench h2 { font-size: 1rem; margin: 0 0 .6rem; }
+.slots-panel { border-left: 1px solid #3a3a3a; }
+.preset-button { display: block; width: 100%; text-align: left; padding: .65rem; margin: .4rem 0; border: 1px solid #414853; border-radius: 5px; background: #222831; color: #e8e8e8; cursor: pointer; }
+.preset-button small { display: block; color: #aeb8c5; margin-top: .25rem; line-height: 1.4; }
+.preset-button:disabled { opacity: .45; cursor: default; }
+.slot-row { display: flex; gap: .65rem; width: 100%; text-align: left; border: 1px solid transparent; border-bottom-color: #303640; padding: .4rem; background: #191d23; color: #8994a1; font: 12px Consolas, monospace; cursor: pointer; }
+.slot-row.occupied { color: #d3e7de; }
+.slot-row.selected { background: #293a50; border-color: #7cb7ff; }
+.slot-row.blocked-slot { color: #ffb56b; }
+.preset-button:hover:not(:disabled), .slot-row:hover { background: #303b49; }
+.preset-button:focus-visible, .slot-row:focus-visible { outline: 2px solid #7cb7ff; outline-offset: 2px; }
+.frame-preview { margin: 0 0 1rem; border: 1px solid #414853; border-radius: 5px; overflow: hidden; }
+#object-preview { cursor: default; width: 100%; height: auto; background-color: #202630; background-image: linear-gradient(45deg,#29323d 25%,transparent 25%),linear-gradient(-45deg,#29323d 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#29323d 75%),linear-gradient(-45deg,transparent 75%,#29323d 75%); background-size: 16px 16px; background-position: 0 0,0 8px,8px -8px,-8px 0; }
+.frame-preview figcaption { padding: .5rem; font: 12px Consolas,monospace; background: #161c24; }
+#slot-count { color: #9eafbf; display: block; margin-top: .3rem; font-weight: normal; }
+@media (max-width: 1000px) {
+  .debug-workbench { grid-template-columns: minmax(200px, .7fr) minmax(300px, 1fr); }
+  .debug-workbench .inspector { grid-column: 1 / -1; max-height: none; border-top: 1px solid #3a3a3a; }
+  .frame-preview { max-width: 420px; }
+}
+@media (max-width: 560px) {
+  .debug-workbench { display: block; }
+  .slots-panel { border-left: 0; }
+  .cheats-panel, .slots-panel { max-height: none; }
+}
