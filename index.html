@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Retro Mutant — private playtest</title>
+<link rel="stylesheet" href="./gate.css">
+</head>
+<body>
+<main id="gate">
+  <p class="eyebrow">RETRO MUTANT / PRIVATE PLAYTEST</p>
+  <h1>Ready for Springfield?</h1>
+  <p>Enter the shared password to unlock this build in your browser.</p>
+  <form id="unlock-form">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required autofocus>
+    <button id="unlock-button" type="submit" disabled>Unlock game</button>
+  </form>
+  <p id="status" role="status">Game files remain encrypted until you unlock them.</p>
+  <p class="note">The password is not saved. Reloading or locking this page requires unlocking again.</p>
+</main>
+<section id="play" hidden>
+  <header><strong>RETRO MUTANT</strong><span>Unlocked for this tab</span><button id="lock-button" type="button">Lock game</button></header>
+  <iframe id="game" title="Retro Mutant game" allow="autoplay"></iframe>
+</section>
+<script type="module" src="./gate.js"></script>
+</body>
+</html>
