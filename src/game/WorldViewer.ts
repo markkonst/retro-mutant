@@ -1,4 +1,5 @@
 import { RuntimeWorld } from "./RuntimeWorld.js";
+import { sceneDrawOrder } from "./RenderOrder.js";
 import { DosHudRenderer } from "./DosHudRenderer.js";
 import { glyphRows } from "./DosFont.js";
 import { applyXrayPalette, createXrayPalette } from "./XrayPalette.js";
@@ -219,14 +220,18 @@ export class WorldViewer {
     this.drawSpecialBackgroundRemaps(level, world, zoom);
     if (this.options.showTerrain) this.drawTerrain(level, zoom);
 
-    for (const object of world.objects) {
-      if (object.active) this.drawObject(object, zoom);
+    for (const sprite of sceneDrawOrder(world.objects, world.bart)) {
+      if (sprite.kind === "bart") this.drawBart(sprite.value, zoom);
+      else this.drawObject(sprite.value, zoom);
     }
-    this.drawEventSpeech(world, zoom);
-
-    // Bart is a separate player/render object in the original engine.
-    this.drawBart(world.bart, zoom);
+    // Hidden DOS controllers remain inspectable, but only as debug markers.
+    if (this.options.showInvisibleControllers) {
+      for (const object of world.objects) {
+        if (object.active && (object.flags & 0x1000) !== 0) this.drawObject(object, zoom);
+      }
+    }
     this.drawInventoryTransients(world, zoom);
+    this.drawEventSpeech(world, zoom);
     this.drawStatueMessage(world, zoom);
     ctx.restore();
 
@@ -422,7 +427,7 @@ export class WorldViewer {
     const screenY = worldY * zoom;
     const selected = this.selectedSourceIndex === object.source.index;
 
-    if (image) {
+    if (image && (object.flags & 0x1000) === 0) {
       this.ctx.drawImage(image, screenX, screenY, image.width * zoom, image.height * zoom);
     } else if (this.options.showInvisibleControllers) {
       this.drawControllerMarker((object.x - this.cameraX) * zoom, object.y * zoom, zoom, selected, object.vmState === "blocked");
@@ -643,19 +648,27 @@ export class WorldViewer {
     const screenX = clientX - rect.left;
     const screenY = clientY - rect.top;
 
-    const bartRect = this.bartScreenRect(world.bart);
-    if (screenX >= bartRect.left && screenX <= bartRect.right && screenY >= bartRect.top && screenY <= bartRect.bottom) {
-      this.selectBart();
-      return;
-    }
-
-    for (let i = world.objects.length - 1; i >= 0; --i) {
-      const object = world.objects[i];
-      if (!object?.active) continue;
-      const hitRect = this.objectScreenRect(object);
+    // Hit-test front to back using the same layers as the canvas compositor.
+    const sprites = sceneDrawOrder(world.objects, world.bart);
+    for (let i = sprites.length - 1; i >= 0; --i) {
+      const sprite = sprites[i]!;
+      if (sprite.kind === "bart" && !sprite.value.renderVisible) continue;
+      const hitRect = sprite.kind === "bart" ? this.bartScreenRect(sprite.value) : this.objectScreenRect(sprite.value);
       if (screenX >= hitRect.left && screenX <= hitRect.right && screenY >= hitRect.top && screenY <= hitRect.bottom) {
-        this.selectSource(object.source.index);
+        if (sprite.kind === "bart") this.selectBart();
+        else this.selectSource(sprite.value.source.index);
         return;
+      }
+    }
+    if (this.options.showInvisibleControllers) {
+      for (const object of world.objects) {
+        if (!object.active || (object.flags & 0x1000) === 0) continue;
+        const x = (object.x - this.cameraX) * this.options.zoom;
+        const y = object.y * this.options.zoom;
+        if (Math.abs(screenX - x) <= 6 && Math.abs(screenY - y) <= 6) {
+          this.selectSource(object.source.index);
+          return;
+        }
       }
     }
     this.clearSelection();

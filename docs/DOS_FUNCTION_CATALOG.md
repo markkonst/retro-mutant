@@ -578,7 +578,7 @@ V11 identifies these platform API targets by the 64-entry FAR-pointer table at o
 | `VGA:1678` | `VGA_Api_InitHudFramePartB` | Platform API +44 (InitHudFramePartB). | OV11 |
 | `VGA:16D5` | `VGA_Api_InitLevelResource` | Platform API +20 (InitLevelResource). | OV11 |
 | `VGA:1805` | `VGA_Api_RenderPassB` | Platform API +1C (RenderPassB). | OV11 |
-| `VGA:18EF` | `VGA_Api_RenderPassA` | Platform API +18 (RenderPassA). | OV11 |
+| `VGA:18EF` | `VGA_Api_RenderPassA` | Platform API +18. VGA:18EF dispatches slot passes 1A2B (flags & 3200h == 0), 1B50 (0200h, not 1000h/2000h), 1C85 (2000h, not 1000h/0200h), Bart 195B, then 1DBA (2200h, not 1000h). Ascending slots within each pass. Recovered 2026-10-30; HIGH for pass order/predicates, other blitter details remain partial. | OV11+CHAT |
 | `VGA:34D1` | `VGA_Api_CameraRenderService65` | Platform API +80 (CameraRenderService65). | OV11 |
 | `VGA:370C` | `VGA_Api_UpdateCamera` | Platform API +10 (UpdateCamera). | OV11 |
 | `VGA:388E` | `VGA_IRQ0_TimerHandler` | Replacement INT 08h/IRQ0 handler; advances timing, periodically calls sound-driver :0000 and chains to saved BIOS timer. | OV11 |

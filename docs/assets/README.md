@@ -99,3 +99,34 @@ Run `node tools/check-repo-assets.mjs` after staging to check the repository ass
 | [export-viewer-assets.py](../../tools/export-viewer-assets.py) | Viewer subset, player tables, messages, reserved scripts and font |
 | [import-decoded-assets.mjs](../../tools/import-decoded-assets.mjs) | Validate and copy the local viewer data |
 | [verify-assets.py](../../tools/verify-assets.py) | Semantic comparison of two exports |
+
+## 9. Sprite layers and overlap
+
+Canvas has no automatic DOS depth ordering. `RenderOrder.ts` reconstructs the
+pass order in VGA.OVL at 18EFh: calls to 1A2Bh, 1B50h, 1C85h, then Bart at
+195Bh, then 1DBAh. Each object pass walks the physical slots in ascending order.
+The flags in each runtime object choose its layer:
+
+| flags & 2200h | Layer |
+| --- | --- |
+| 0000h | First object-bank pass |
+| 0200h | Second object-bank pass |
+| 2000h | Common/Bart-bank scenery behind Bart |
+| — | Bart |
+| 2200h | Common/Bart-bank scenery in front of Bart |
+
+Flag 1000h suppresses the sprite in every object pass. The viewer can still show
+a debug controller marker when that option is enabled. Picking uses reverse
+sprite order, so the inspector selects foreground scenery before Bart.
+
+For example, Level 1 source 0 (the bin at X=88) has flags A01Fh and belongs behind
+Bart. Sources 17 and 44 (bins at X=1184 and X=2716) have A21Fh and belong in front.
+Sorting by sprite Y or putting every bin in front would break this distinction.
+These flags are already in the extracted JSON; no asset re-extraction is needed.
+
+Confidence: HIGH for these VGA pass predicates and their call order, recovered
+directly from the unpacked overlay. This does not claim a complete port of VGA
+blitting, dirty rectangles, special background commands or transient rendering.
+The browser still redraws the entire frame, and speech/debug overlays remain
+viewer layers. `tools/smoke-render-order.mjs` checks every nonzero flag word,
+actual bin records, compositor order and selection.
